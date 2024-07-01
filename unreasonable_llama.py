@@ -1,16 +1,37 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 
 import httpx
+import json
 
 
 @dataclass
 class LlamaHealth:
     status: str
-    slots_idle: int | None
-    slots_processing: int | None
+    slots_idle: int | None = None
+    slots_processing: int | None = None
+
+
+@dataclass
+class LlamaSystemPrompt:
+    prompt: str
+    anti_prompt: str
+    assistant_name: str
+
+
+@dataclass
+class LlamaCompletionRequest:
+    prompt: str | list[str] | list[int]
+    system_prompt: LlamaSystemPrompt | None = None
+    stream: bool | None = None
+    stop: list[str] | None = None
+    cache_prompt: bool | None = None
+
+
+def _filter_nones_from_dict(input: dict) -> dict:
+    return {k: v for k, v in input.items() if v is not None}
 
 
 class UnreasonableLlama:
@@ -39,3 +60,8 @@ class UnreasonableLlama:
     def get_health(self):
         response = self.client.get("health").json()
         return LlamaHealth(**response)
+
+    def get_completion(self, request: LlamaCompletionRequest):
+        request_dict = _filter_nones_from_dict(asdict(request))
+        response = self.client.post("completions", data=json.dumps(request_dict)).json()
+        return response
