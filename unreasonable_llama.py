@@ -3,11 +3,12 @@ from __future__ import annotations
 import json
 import os
 from dataclasses import asdict, dataclass
+from typing import Self
 
 import httpx
 
 
-def _remove_none_values(dictionary):
+def _remove_none_values(dictionary: dict) -> dict:
     """Recursively removes None values from a Python dictionary.
 
     Args:
@@ -31,12 +32,13 @@ class ToJson:
         return json.dumps(_remove_none_values(asdict(self)))
 
 
-@dataclass
-class LlamaHealth(ToJson):
-    status: str
-    slots_idle: int | None = None
-    slots_processing: int | None = None
+class FromJson:
+    @classmethod
+    def from_json(cls, data: dict) -> Self:
+        return cls(**data)
 
+
+# request data types
 
 type LlamaPrompt = str | list[str] | list[int]
 
@@ -87,6 +89,16 @@ class LlamaCompletionRequest(ToJson):
     samplers: list[str] | None = None
 
 
+# response data types
+
+
+@dataclass(frozen=True)
+class LlamaHealth(FromJson):
+    status: str
+    slots_idle: int | None = None
+    slots_processing: int | None = None
+
+
 class UnreasonableLlama:
     def __init__(
         self,
@@ -112,7 +124,7 @@ class UnreasonableLlama:
 
     def get_health(self):
         response = self.client.get("health").json()
-        return LlamaHealth(**response)
+        return LlamaHealth.from_json(response)
 
     def get_completion(self, request: LlamaCompletionRequest):
         response = self.client.post("completions", data=request.to_json()).json()
