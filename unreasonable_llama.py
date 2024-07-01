@@ -93,10 +93,130 @@ class LlamaCompletionRequest(ToJson):
 
 
 @dataclass(frozen=True)
+class LlamaNextToken(FromJson):
+    has_next_token: bool
+    n_remain: int
+    n_decoded: int
+    stopped_eos: bool
+    stopped_word: bool
+    stopped_limit: bool
+    stopping_word: str
+
+
+@dataclass(frozen=True)
+class LlamaSlot(FromJson):
+    n_ctx: int
+    n_predict: int
+    model: str
+    seed: int
+    temperature: float
+    dynatemp_range: float
+    dynatemp_exponent: float
+    top_k: int
+    top_p: float
+    min_p: float
+    tfs_z: float
+    typical_p: float
+    repeat_last_n: int
+    repeat_penalty: float
+    presence_penalty: float
+    frequency_penalty: float
+    penalty_prompt_tokens: list
+    use_penalty_prompt_tokens: bool
+    mirostat: int
+    mirostat_tau: float
+    mirostat_eta: float
+    penalize_nl: bool
+    stop: list[str]
+    n_keep: int
+    n_discard: int
+    ignore_eos: bool
+    stream: bool
+    logit_bias: list
+    n_probs: int
+    min_keep: int
+    grammar: str
+    samplers: list[str]
+    id: int
+    id_task: int
+    state: int
+    prompt: str
+    next_token: LlamaNextToken
+
+
+@dataclass(frozen=True)
 class LlamaHealth(FromJson):
     status: str
     slots_idle: int | None = None
     slots_processing: int | None = None
+    slots: list[LlamaSlot] | None = None
+
+
+@dataclass(frozen=True)
+class LlamaGenerationSettings(FromJson):
+    n_ctx: int
+    n_predict: int
+    model: str
+    seed: int
+    temperature: float
+    dynatemp_range: float
+    dynatemp_exponent: float
+    top_k: int
+    top_p: float
+    min_p: float
+    tfs_z: float
+    typical_p: float
+    repeat_last_n: int
+    repeat_penalty: float
+    presence_penalty: float
+    frequency_penalty: float
+    penalty_prompt_tokens: list
+    use_penalty_prompt_tokens: bool
+    mirostat: int
+    mirostat_tau: float
+    mirostat_eta: float
+    penalize_nl: bool
+    stop: list[str]
+    n_keep: int
+    n_discard: int
+    ignore_eos: bool
+    stream: bool
+    logit_bias: list
+    n_probs: int
+    min_keep: int
+    grammar: str
+    samplers: list[str]
+
+
+@dataclass(frozen=True)
+class LlamaTimings(FromJson):
+    prompt_n: int
+    prompt_ms: float
+    prompt_per_token_ms: float
+    prompt_per_second: float
+    predicted_n: int
+    predicted_ms: float
+    predicted_per_token_ms: float
+    predicted_per_second: float
+
+
+@dataclass(frozen=True)
+class LlamaCompletionResponse(FromJson):
+    content: str
+    id_slot: int
+    stop: bool
+    model: str
+    tokens_predicted: int
+    tokens_evaluated: int
+    generation_settings: LlamaGenerationSettings
+    prompt: str
+    truncated: bool
+    stopped_eos: bool
+    stopped_word: bool
+    stopped_limit: bool
+    stopping_word: str
+    tokens_cached: int
+    timings: LlamaTimings
 
 
 class UnreasonableLlama:
@@ -122,10 +242,12 @@ class UnreasonableLlama:
     def close(self):
         self.client.close()
 
-    def get_health(self):
-        response = self.client.get("health").json()
+    def get_health(self, include_slots: bool = False):
+        response = self.client.get(
+            "health", params="include_slots" if include_slots else ""
+        ).json()
         return LlamaHealth.from_json(response)
 
     def get_completion(self, request: LlamaCompletionRequest):
         response = self.client.post("completions", data=request.to_json()).json()
-        return json.dumps(response, indent=2)
+        return LlamaCompletionResponse.from_json(response)
