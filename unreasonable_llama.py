@@ -1,37 +1,90 @@
 from __future__ import annotations
 
+import json
 import os
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 
 import httpx
-import json
+
+
+def _remove_none_values(dictionary):
+    """Recursively removes None values from a Python dictionary.
+
+    Args:
+      dictionary: The dictionary to remove None values from.
+
+    Returns:
+      A new dictionary with all None values removed.
+    """
+
+    new_dict = {}
+    for key, value in dictionary.items():
+        if isinstance(value, dict):
+            new_dict[key] = _remove_none_values(value)
+        elif value is not None:
+            new_dict[key] = value
+    return new_dict
+
+
+class ToJson:
+    def to_json(self) -> str:
+        return json.dumps(_remove_none_values(asdict(self)))
 
 
 @dataclass
-class LlamaHealth:
+class LlamaHealth(ToJson):
     status: str
     slots_idle: int | None = None
     slots_processing: int | None = None
 
 
+type LlamaPrompt = str | list[str] | list[int]
+
+
 @dataclass
-class LlamaSystemPrompt:
-    prompt: str
+class LlamaSystemPrompt(ToJson):
+    prompt: LlamaPrompt
     anti_prompt: str
     assistant_name: str
 
 
 @dataclass
-class LlamaCompletionRequest:
-    prompt: str | list[str] | list[int]
+class LlamaCompletionRequest(ToJson):
+    prompt: LlamaPrompt
     system_prompt: LlamaSystemPrompt | None = None
     stream: bool | None = None
     stop: list[str] | None = None
     cache_prompt: bool | None = None
-
-
-def _filter_nones_from_dict(input: dict) -> dict:
-    return {k: v for k, v in input.items() if v is not None}
+    temperature: float | None = None
+    dynatemp_range: float | None = None
+    dynatemp_exponent: float | None = None
+    top_k: int | None = None
+    top_p: float | None = None
+    min_p: float | None = None
+    n_predict: int | None = None
+    n_keep: int | None = None
+    tfs_z: float | None = None
+    typical_p: float | None = None
+    repeat_penalty: float | None = None
+    repeat_last_n: int | None = None
+    penalize_nl: bool | None = None
+    presence_penalty: float | None = None
+    frequency_penalty: float | None = None
+    penalty_prompt: LlamaPrompt | None = None
+    mirostat: int | None = None
+    mirostat_tau: float | None = None
+    mirostat_eta: float | None = None
+    grammar: object | None = None  # todo: type this correctly
+    json_schema: dict[str, object] | list[str] | None = None
+    seed: int | None = None
+    ignore_eos: bool | None = None
+    logit_bias: list | None = None  # todo: type this correctly
+    n_probs: int | None = None
+    min_keep: int | None = None
+    image_data: list | None = None
+    id_slot: int | None = None
+    cache_prompt: bool | None = None
+    samplers: list[str] | None = None
 
 
 class UnreasonableLlama:
@@ -62,6 +115,5 @@ class UnreasonableLlama:
         return LlamaHealth(**response)
 
     def get_completion(self, request: LlamaCompletionRequest):
-        request_dict = _filter_nones_from_dict(asdict(request))
-        response = self.client.post("completions", data=json.dumps(request_dict)).json()
-        return response
+        response = self.client.post("completions", data=request.to_json()).json()
+        return json.dumps(response, indent=2)
