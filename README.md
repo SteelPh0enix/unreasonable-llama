@@ -1,2 +1,5 @@
 # unreasonable-llama
-Python API for llama.cpp webserver
+
+Yet another Python API for llama.cpp server
+
+WIP
