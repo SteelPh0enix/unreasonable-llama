@@ -193,6 +193,9 @@ class LlamaTimings(FromJson):
     predicted_per_second: float
 
 
+type LlamaError = str
+
+
 @dataclass(frozen=True)
 class LlamaCompletionResponse(FromJson):
     content: str
@@ -210,6 +213,12 @@ class LlamaCompletionResponse(FromJson):
     stopping_word: str
     tokens_cached: int
     timings: LlamaTimings
+
+    @classmethod
+    def from_json(cls, data: dict) -> Self | LlamaError:
+        if "error" in data:
+            return data["error"]
+        return super().from_json(data)
 
 
 class UnreasonableLlama:
