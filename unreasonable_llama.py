@@ -44,16 +44,9 @@ type LlamaPrompt = str | list[str] | list[int]
 
 
 @dataclass
-class LlamaSystemPrompt(ToJson):
-    prompt: LlamaPrompt
-    anti_prompt: str
-    assistant_name: str
-
-
-@dataclass
 class LlamaCompletionRequest(ToJson):
     prompt: LlamaPrompt
-    system_prompt: LlamaSystemPrompt | None = None
+    system_prompt: str | None = None
     stream: bool | None = None
     stop: list[str] | None = None
     cache_prompt: bool | None = None
