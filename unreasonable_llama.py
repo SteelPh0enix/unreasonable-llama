@@ -32,6 +32,11 @@ class ToJson:
         return json.dumps(_remove_none_values(asdict(self)))
 
 
+class ToDict:
+    def to_dict(self) -> dict:
+        return _remove_none_values(asdict(self))
+
+
 class FromJson:
     @classmethod
     def from_json(cls, data: dict) -> Self:
@@ -44,10 +49,9 @@ type LlamaPrompt = str | list[str] | list[int]
 
 
 @dataclass
-class LlamaCompletionRequest(ToJson):
+class LlamaCompletionRequest(ToJson, ToDict):
     prompt: LlamaPrompt
     system_prompt: str | None = None
-    stream: bool | None = None
     stop: list[str] | None = None
     cache_prompt: bool | None = None
     temperature: float | None = None
@@ -201,18 +205,19 @@ class LlamaCompletionResponse(FromJson):
     content: str
     id_slot: int
     stop: bool
-    model: str
-    tokens_predicted: int
-    tokens_evaluated: int
-    generation_settings: LlamaGenerationSettings
-    prompt: str
-    truncated: bool
-    stopped_eos: bool
-    stopped_word: bool
-    stopped_limit: bool
-    stopping_word: str
-    tokens_cached: int
-    timings: LlamaTimings
+    multimodal: str | None = None
+    model: str | None = None
+    tokens_predicted: int | None = None
+    tokens_evaluated: int | None = None
+    generation_settings: LlamaGenerationSettings | None = None
+    prompt: str | None = None
+    truncated: bool | None = None
+    stopped_eos: bool | None = None
+    stopped_word: bool | None = None
+    stopped_limit: bool | None = None
+    stopping_word: str | None = None
+    tokens_cached: int | None = None
+    timings: LlamaTimings | None = None
 
     @classmethod
     def from_json(cls, data: dict) -> Self | LlamaError:
@@ -244,12 +249,34 @@ class UnreasonableLlama:
     def close(self):
         self.client.close()
 
-    def get_health(self, include_slots: bool = False):
+    def get_health(self, include_slots: bool = False) -> LlamaHealth:
         response = self.client.get(
             "health", params="include_slots" if include_slots else ""
         ).json()
         return LlamaHealth.from_json(response)
 
-    def get_completion(self, request: LlamaCompletionRequest):
-        response = self.client.post("completions", data=request.to_json()).json()
-        return LlamaCompletionResponse.from_json(response)
+    def get_completion(
+        self, request: LlamaCompletionRequest
+    ) -> LlamaCompletionResponse:
+        request_dict = request.to_dict()
+        request_dict["stream"] = False
+        request_json = json.dumps(request_dict)
+
+        response = self.client.post("completions", data=request_json)
+        return LlamaCompletionResponse.from_json(response.json())
+
+    async def get_streamed_completion(
+        self, request: LlamaCompletionRequest
+    ) -> LlamaCompletionResponse | httpx.Response:  # "debug it yourself!"
+        request_dict = request.to_dict()
+        request_dict["stream"] = True
+        request_json = json.dumps(request_dict)
+
+        response = self.client.post("completions", data=request_json)
+        if response.status_code != 200:
+            yield response
+        else:
+            for chunk in response.iter_lines():
+                if chunk.startswith("data: "):
+                    chunk = chunk.removeprefix("data: ")
+                    yield LlamaCompletionResponse.from_json(json.loads(chunk))
