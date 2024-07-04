@@ -267,15 +267,12 @@ class UnreasonableLlama:
 
     async def get_streamed_completion(
         self, request: LlamaCompletionRequest
-    ) -> LlamaCompletionResponse | httpx.Response:  # "debug it yourself!"
+        ) -> LlamaCompletionResponse:
         request_dict = request.to_dict()
         request_dict["stream"] = True
         request_json = json.dumps(request_dict)
 
-        response = self.client.post("completions", data=request_json)
-        if response.status_code != 200:
-            yield response
-        else:
+        with self.client.stream("POST", "completions", data=request_json) as response:
             for chunk in response.iter_lines():
                 if chunk.startswith("data: "):
                     chunk = chunk.removeprefix("data: ")
