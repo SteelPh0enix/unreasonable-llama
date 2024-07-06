@@ -148,6 +148,12 @@ class LlamaHealth(FromJson):
     slots_processing: int | None = None
     slots: list[LlamaSlot] | None = None
 
+    @classmethod
+    def from_json(cls, data: dict) -> Self:
+        if "slots" in data:
+            data["slots"] = [LlamaSlot.from_json(slot) for slot in data["slots"]]
+        return super().from_json(data)
+
 
 @dataclass(frozen=True)
 class LlamaGenerationSettings(FromJson):
@@ -230,7 +236,6 @@ class UnreasonableLlama:
     def __init__(
         self,
         server_url: str = "",
-        system_prompt: str = "",
         request_timeout: int = 10000,
     ):
         if server_url == "":
@@ -238,8 +243,7 @@ class UnreasonableLlama:
             if server_url is None:
                 raise RuntimeError("Missing llama.cpp server URL!")
 
-        self.system_prompt = system_prompt
-
+        self.server_url = server_url
         self.client = httpx.Client(
             headers={"Content-Type": "application/json"},
             timeout=request_timeout,
@@ -267,7 +271,7 @@ class UnreasonableLlama:
 
     async def get_streamed_completion(
         self, request: LlamaCompletionRequest
-        ) -> LlamaCompletionResponse:
+    ) -> LlamaCompletionResponse:
         request_dict = request.to_dict()
         request_dict["stream"] = True
         request_json = json.dumps(request_dict)
