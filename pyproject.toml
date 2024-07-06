@@ -1,9 +1,12 @@
 [tool.poetry]
 name = "unreasonable-llama"
 version = "0.1.0"
-description = "Yet another Python API for llama.cpp server"
+description = "HTTP API bindings for llama.cpp built-in server"
 authors = ["SteelPh0enix <wojciech_olech@hotmail.com>"]
 readme = "README.md"
+license = "MIT"
+repository = "https://github.com/SteelPh0enix/unreasonable-llama/"
+keywords = ["llama.cpp", "llama", "llm", "api", "bindings"]
 
 [tool.poetry.dependencies]
 python = "^3.12"
