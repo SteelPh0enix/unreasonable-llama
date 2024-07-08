@@ -206,7 +206,7 @@ class LlamaTimings(FromJson):
 type LlamaError = str
 
 
-@dataclass(frozen=True)
+@dataclass()
 class LlamaCompletionResponse(FromJson):
     content: str
     id_slot: int
@@ -229,7 +229,18 @@ class LlamaCompletionResponse(FromJson):
     def from_json(cls, data: dict) -> Self | LlamaError:
         if "error" in data:
             return data["error"]
-        return super().from_json(data)
+        if "timings" in data:
+            data["timings"] = LlamaTimings.from_json(data["timings"])
+
+        response = super().from_json(data)
+
+        # add missing `generation_settings` fields
+        if "generation_settings" in data:
+            response.generation_settings = LlamaGenerationSettings.from_json(
+                data["generation_settings"]
+            )
+
+        return response
 
 
 class UnreasonableLlama:
