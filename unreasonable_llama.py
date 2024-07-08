@@ -333,9 +333,23 @@ class UnreasonableLlama:
                     chunk = chunk.removeprefix("data: ")
                     yield LlamaCompletionResponse.from_json(json.loads(chunk))
 
-    async def get_infill(self, request: LlamaInfillRequest) -> LlamaCompletionResponse:
-        request_json = request.to_json()
+    def get_infill(self, request: LlamaInfillRequest) -> LlamaCompletionResponse:
+        request_dict = request.to_dict()
+        request_dict["stream"] = False
+        request_json = json.dumps(request_dict)
+
+        response = self.client.post("infill", data=request_json)
+        return LlamaCompletionResponse.from_json(response.json())
+
+    async def get_streamed_infill(
+        self, request: LlamaInfillRequest
+    ) -> LlamaCompletionResponse:
+        request_dict = request.to_dict()
+        request_dict["stream"] = True
+        request_json = json.dumps(request_dict)
 
         with self.client.stream("POST", "infill", data=request_json) as response:
-            for chunk in response.iter_text():
-                yield LlamaCompletionResponse.from_json(json.loads(chunk))
+            for chunk in response.iter_lines():
+                if chunk.startswith("data: "):
+                    chunk = chunk.removeprefix("data: ")
+                    yield LlamaCompletionResponse.from_json(json.loads(chunk))

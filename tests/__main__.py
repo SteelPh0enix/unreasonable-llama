@@ -56,18 +56,28 @@ request = LlamaCompletionRequest(
 asyncio.run(get_async_completion(llama, request))
 
 
-async def get_infill(llama: UnreasonableLlama, request: LlamaInfillRequest):
-    print("Requesting infill for:")
+infill_request = LlamaInfillRequest(
+    input_prefix="def calculate_square_root(number: float) -> float:",
+    input_suffix="",
+    n_predict=100,
+)
+infill_response = llama.get_infill(infill_request)
+print(f"Synchronous infill response:\n{infill_request.input_prefix}\n{infill_response.content}\n")
+
+
+async def get_async_infill(llama: UnreasonableLlama, request: LlamaInfillRequest):
+    print("Requesting async infill:")
     print(request.input_prefix)
-    async for chunk in llama.get_infill(request):
+    async for chunk in llama.get_streamed_infill(request):
         print(chunk.content, end="", flush=True)
 
 
 infill_request = LlamaInfillRequest(
-    input_prefix="def calculate_square_root(number: float) -> float:",
+    input_prefix="def pretty_print_user_message(message: str):",
     input_suffix="",
+    n_predict=150,
 )
-asyncio.run(get_infill(llama, infill_request))
+asyncio.run(get_async_infill(llama, infill_request))
 
 # closing is recommended
 llama.close()
