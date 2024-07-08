@@ -86,6 +86,45 @@ class LlamaCompletionRequest(ToJson, ToDict):
     samplers: list[str] | None = None
 
 
+@dataclass
+class LlamaInfillRequest(ToJson, ToDict):
+    input_prefix: str
+    input_suffix: str
+    system_prompt: str | None = None
+    stop: list[str] | None = None
+    cache_prompt: bool | None = None
+    temperature: float | None = None
+    dynatemp_range: float | None = None
+    dynatemp_exponent: float | None = None
+    top_k: int | None = None
+    top_p: float | None = None
+    min_p: float | None = None
+    n_predict: int | None = None
+    n_keep: int | None = None
+    tfs_z: float | None = None
+    typical_p: float | None = None
+    repeat_penalty: float | None = None
+    repeat_last_n: int | None = None
+    penalize_nl: bool | None = None
+    presence_penalty: float | None = None
+    frequency_penalty: float | None = None
+    penalty_prompt: LlamaPrompt | None = None
+    mirostat: int | None = None
+    mirostat_tau: float | None = None
+    mirostat_eta: float | None = None
+    grammar: object | None = None  # todo: type this correctly
+    json_schema: dict[str, object] | list[str] | None = None
+    seed: int | None = None
+    ignore_eos: bool | None = None
+    logit_bias: list | None = None  # todo: type this correctly
+    n_probs: int | None = None
+    min_keep: int | None = None
+    image_data: list | None = None
+    id_slot: int | None = None
+    cache_prompt: bool | None = None
+    samplers: list[str] | None = None
+
+
 # response data types
 
 
@@ -229,6 +268,7 @@ class LlamaCompletionResponse(FromJson):
     def from_json(cls, data: dict) -> Self | LlamaError:
         if "error" in data:
             return data["error"]
+
         if "timings" in data:
             data["timings"] = LlamaTimings.from_json(data["timings"])
 
@@ -292,3 +332,10 @@ class UnreasonableLlama:
                 if chunk.startswith("data: "):
                     chunk = chunk.removeprefix("data: ")
                     yield LlamaCompletionResponse.from_json(json.loads(chunk))
+
+    async def get_infill(self, request: LlamaInfillRequest) -> LlamaCompletionResponse:
+        request_json = request.to_json()
+
+        with self.client.stream("POST", "infill", data=request_json) as response:
+            for chunk in response.iter_text():
+                yield LlamaCompletionResponse.from_json(json.loads(chunk))

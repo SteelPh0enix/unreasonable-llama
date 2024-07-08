@@ -1,9 +1,11 @@
 import asyncio
-import httpx
 import sys
+
+import httpx
 
 from unreasonable_llama import (
     LlamaCompletionRequest,
+    LlamaInfillRequest,
     UnreasonableLlama,
 )
 
@@ -52,6 +54,20 @@ request = LlamaCompletionRequest(
     prompt="Briefly describe highest mountain on Earth.\n", n_predict=300
 )
 asyncio.run(get_async_completion(llama, request))
+
+
+async def get_infill(llama: UnreasonableLlama, request: LlamaInfillRequest):
+    print("Requesting infill for:")
+    print(request.input_prefix)
+    async for chunk in llama.get_infill(request):
+        print(chunk.content, end="", flush=True)
+
+
+infill_request = LlamaInfillRequest(
+    input_prefix="def calculate_square_root(number: float) -> float:",
+    input_suffix="",
+)
+asyncio.run(get_infill(llama, infill_request))
 
 # closing is recommended
 llama.close()
