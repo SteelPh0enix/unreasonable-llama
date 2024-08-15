@@ -21,6 +21,9 @@ ruff = "^0.5.5"
 ruff-lsp = "^0.0.54"
 mypy = "^1.11.0"
 
+[tool.ruff]
+line-length = 120
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"

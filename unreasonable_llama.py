@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+from collections.abc import AsyncGenerator
 from dataclasses import asdict, dataclass
 from typing import Self
 
@@ -29,12 +30,12 @@ def _remove_none_values(dictionary: dict) -> dict:
 
 class ToJson:
     def to_json(self) -> str:
-        return json.dumps(_remove_none_values(asdict(self)))
+        return json.dumps(_remove_none_values(asdict(self)))  # type: ignore
 
 
 class ToDict:
     def to_dict(self) -> dict:
-        return _remove_none_values(asdict(self))
+        return _remove_none_values(asdict(self))  # type: ignore
 
 
 class FromJson:
@@ -267,7 +268,7 @@ class LlamaCompletionResponse(FromJson):
     timings: LlamaTimings | None = None
 
     @classmethod
-    def from_json(cls, data: dict) -> Self | LlamaError:
+    def from_json(cls, data: dict) -> Self:
         if "error" in data:
             return data["error"]
 
@@ -292,8 +293,9 @@ class UnreasonableLlama:
         request_timeout: int = 10000,
     ):
         if server_url == "":
-            server_url = os.getenv("LLAMA_CPP_SERVER_URL")
-            if server_url is None:
+            if server_url_from_env := os.getenv("LLAMA_CPP_SERVER_URL"):
+                server_url = server_url_from_env
+            else:
                 raise RuntimeError("Missing llama.cpp server URL!")
 
         self.server_url = server_url
@@ -319,17 +321,17 @@ class UnreasonableLlama:
         request_dict["stream"] = False
         request_json = json.dumps(request_dict)
 
-        response = self.client.post("completions", data=request_json)
+        response = self.client.post("completions", data=request_json)  # type: ignore
         return LlamaCompletionResponse.from_json(response.json())
 
     async def get_streamed_completion(
         self, request: LlamaCompletionRequest
-    ) -> LlamaCompletionResponse:
+    ) -> AsyncGenerator:
         request_dict = request.to_dict()
         request_dict["stream"] = True
         request_json = json.dumps(request_dict)
 
-        with self.client.stream("POST", "completions", data=request_json) as response:
+        with self.client.stream("POST", "completions", data=request_json) as response:  # type: ignore
             for chunk in response.iter_lines():
                 if chunk.startswith("data: "):
                     chunk = chunk.removeprefix("data: ")
@@ -340,17 +342,15 @@ class UnreasonableLlama:
         request_dict["stream"] = False
         request_json = json.dumps(request_dict)
 
-        response = self.client.post("infill", data=request_json)
+        response = self.client.post("infill", data=request_json)  # type: ignore
         return LlamaCompletionResponse.from_json(response.json())
 
-    async def get_streamed_infill(
-        self, request: LlamaInfillRequest
-    ) -> LlamaCompletionResponse:
+    async def get_streamed_infill(self, request: LlamaInfillRequest) -> AsyncGenerator:
         request_dict = request.to_dict()
         request_dict["stream"] = True
         request_json = json.dumps(request_dict)
 
-        with self.client.stream("POST", "infill", data=request_json) as response:
+        with self.client.stream("POST", "infill", data=request_json) as response:  # type: ignore
             for chunk in response.iter_lines():
                 if chunk.startswith("data: "):
                     chunk = chunk.removeprefix("data: ")
