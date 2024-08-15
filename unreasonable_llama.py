@@ -83,7 +83,6 @@ class LlamaCompletionRequest(ToJson, ToDict):
     min_keep: int | None = None
     image_data: list | None = None
     id_slot: int | None = None
-    cache_prompt: bool | None = None
     samplers: list[str] | None = None
 
 
@@ -122,7 +121,6 @@ class LlamaInfillRequest(ToJson, ToDict):
     min_keep: int | None = None
     image_data: list | None = None
     id_slot: int | None = None
-    cache_prompt: bool | None = None
     samplers: list[str] | None = None
 
 
@@ -270,7 +268,7 @@ class LlamaCompletionResponse(FromJson):
     @classmethod
     def from_json(cls, data: dict) -> Self:
         if "error" in data:
-            return data["error"]
+            raise data["error"]
 
         if "timings" in data:
             data["timings"] = LlamaTimings.from_json(data["timings"])
@@ -303,7 +301,7 @@ class UnreasonableLlama:
             base_url=server_url,
         )
 
-    def close(self):
+    def close(self) -> None:
         self.client.close()
 
     def get_health(self, include_slots: bool = False) -> LlamaHealth:
