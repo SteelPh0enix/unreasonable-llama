@@ -143,6 +143,7 @@ class LlamaNextToken(FromJson):
 class LlamaSlot(FromJson):
     n_ctx: int
     n_predict: int
+    max_tokens: int
     model: str
     seed: int
     temperature: float
@@ -198,6 +199,7 @@ class LlamaHealth(FromJson):
 class LlamaGenerationSettings(FromJson):
     n_ctx: int
     n_predict: int
+    max_tokens: int
     model: str
     seed: int
     temperature: float
