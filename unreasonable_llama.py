@@ -279,9 +279,7 @@ class LlamaCompletionResponse(FromJson):
 
         # add missing `generation_settings` fields
         if "generation_settings" in data:
-            response.generation_settings = LlamaGenerationSettings.from_json(
-                data["generation_settings"]
-            )
+            response.generation_settings = LlamaGenerationSettings.from_json(data["generation_settings"])
 
         return response
 
@@ -309,14 +307,10 @@ class UnreasonableLlama:
         self.client.close()
 
     def get_health(self, include_slots: bool = False) -> LlamaHealth:
-        response = self.client.get(
-            "health", params="include_slots" if include_slots else ""
-        ).json()
+        response = self.client.get("health", params="include_slots" if include_slots else "").json()
         return LlamaHealth.from_json(response)
 
-    def get_completion(
-        self, request: LlamaCompletionRequest
-    ) -> LlamaCompletionResponse:
+    def get_completion(self, request: LlamaCompletionRequest) -> LlamaCompletionResponse:
         request_dict = request.to_dict()
         request_dict["stream"] = False
         request_json = json.dumps(request_dict)
@@ -324,9 +318,7 @@ class UnreasonableLlama:
         response = self.client.post("completions", data=request_json)  # type: ignore
         return LlamaCompletionResponse.from_json(response.json())
 
-    async def get_streamed_completion(
-        self, request: LlamaCompletionRequest
-    ) -> AsyncGenerator:
+    async def get_streamed_completion(self, request: LlamaCompletionRequest) -> AsyncGenerator:
         request_dict = request.to_dict()
         request_dict["stream"] = True
         request_json = json.dumps(request_dict)
