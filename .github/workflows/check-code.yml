@@ -1,0 +1,27 @@
+name: Check code formatting and validity
+run-name: Check the library's code formatting and validity with Ruff and mypy.
+on: push
+
+jobs:
+  check-code:
+    name: Check Python code
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 'Checkout code'
+        uses: actions/checkout@v4
+      - name: 'Setup Python'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: 'Install Poetry'
+        run: pipx install poetry
+      - name: 'Install project dependencies'
+        run: poetry install
+      - name: 'Check code formatting'
+        run: poetry run ruff format --diff $(ls ./*.py)
+      - name: 'Check code with ruff'
+        run: poetry run ruff check --no-fix --no-unsafe-fixes --statistics $(ls ./*.py)
+      - name: 'Check code with mypy'
+        run: poetry run mypy --strict --pretty $(ls ./*.py)
+
