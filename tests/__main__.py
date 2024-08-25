@@ -16,10 +16,12 @@ llama = UnreasonableLlama()
 # llama = UnreasonableLlama("http://localhost:8080/")
 
 try:
-    # you can use `get_health()` to check server connection and get info about
-    # loaded models
-    health = llama.get_health(include_slots=True)
-    print(f"Currently loaded model: {health.slots[0].model}")
+    # you can use `is_alive()` to check server connection
+    if llama.is_alive():
+        print("llama server is alive!")
+    else:
+        print("llama server is not alive, quitting!")
+        sys.exit(1)
 except httpx.ConnectError:
     print(
         f"Unable to connect to llama.cpp server @ {llama.server_url}, verify if it's running under correct host/port?"
@@ -32,16 +34,12 @@ except httpx.ConnectError:
 # is as simple as it can possibly be and doesn't provide any high-level
 # functions. Therefore, the following test may result in model spewing
 # nonsense, but as long as it responds, you can assume it's working correctly.
-request = LlamaCompletionRequest(
-    prompt="Briefly describe highest mountain on Mars.\n", n_predict=200
-)
+request = LlamaCompletionRequest(prompt="Briefly describe highest mountain on Mars.\n", n_predict=200)
 response = llama.get_completion(request)
 print(f"Synchronous response: {response.content}\n")
 
 
-async def get_async_completion(
-    llama: UnreasonableLlama, request: LlamaCompletionRequest
-):
+async def get_async_completion(llama: UnreasonableLlama, request: LlamaCompletionRequest):
     print("Asynchronous response: ", end="", flush=True)
     async for chunk in llama.get_streamed_completion(request):
         # chunk is LlamaCompletionResponse
@@ -50,15 +48,13 @@ async def get_async_completion(
     print("\n")
 
 
-request = LlamaCompletionRequest(
-    prompt="Briefly describe highest mountain on Earth.\n", n_predict=300
-)
+request = LlamaCompletionRequest(prompt="Briefly describe highest mountain on Earth.\n", n_predict=300)
 asyncio.run(get_async_completion(llama, request))
 
 
 infill_request = LlamaInfillRequest(
     input_prefix="def calculate_square_root(number: float) -> float:",
-    input_suffix="",
+    input_suffix="\treturn square_root",
     n_predict=100,
 )
 infill_response = llama.get_infill(infill_request)
@@ -74,8 +70,8 @@ async def get_async_infill(llama: UnreasonableLlama, request: LlamaInfillRequest
 
 infill_request = LlamaInfillRequest(
     input_prefix="def pretty_print_user_message(message: str):",
-    input_suffix="",
-    n_predict=150,
+    input_suffix="\treturn new_message",
+    n_predict=100,
 )
 asyncio.run(get_async_infill(llama, infill_request))
 

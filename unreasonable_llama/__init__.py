@@ -52,76 +52,76 @@ type LlamaPrompt = str | list[str] | list[int]
 @dataclass
 class LlamaCompletionRequest(ToJson, ToDict):
     prompt: LlamaPrompt
-    system_prompt: str | None = None
-    stop: list[str] | None = None
     cache_prompt: bool | None = None
-    temperature: float | None = None
-    dynatemp_range: float | None = None
     dynatemp_exponent: float | None = None
+    dynatemp_range: float | None = None
+    frequency_penalty: float | None = None
+    grammar: object | None = None  # todo: type this correctly
+    id_slot: int | None = None
+    ignore_eos: bool | None = None
+    image_data: list | None = None
+    json_schema: dict[str, object] | list[str] | None = None
+    logit_bias: list | None = None  # todo: type this correctly
+    min_keep: int | None = None
+    min_p: float | None = None
+    mirostat: int | None = None
+    mirostat_eta: float | None = None
+    mirostat_tau: float | None = None
+    n_keep: int | None = None
+    n_predict: int | None = None
+    n_probs: int | None = None
+    penalize_nl: bool | None = None
+    penalty_prompt: LlamaPrompt | None = None
+    presence_penalty: float | None = None
+    repeat_last_n: int | None = None
+    repeat_penalty: float | None = None
+    samplers: list[str] | None = None
+    seed: int | None = None
+    stop: list[str] | None = None
+    system_prompt: str | None = None
+    temperature: float | None = None
+    tfs_z: float | None = None
     top_k: int | None = None
     top_p: float | None = None
-    min_p: float | None = None
-    n_predict: int | None = None
-    n_keep: int | None = None
-    tfs_z: float | None = None
     typical_p: float | None = None
-    repeat_penalty: float | None = None
-    repeat_last_n: int | None = None
-    penalize_nl: bool | None = None
-    presence_penalty: float | None = None
-    frequency_penalty: float | None = None
-    penalty_prompt: LlamaPrompt | None = None
-    mirostat: int | None = None
-    mirostat_tau: float | None = None
-    mirostat_eta: float | None = None
-    grammar: object | None = None  # todo: type this correctly
-    json_schema: dict[str, object] | list[str] | None = None
-    seed: int | None = None
-    ignore_eos: bool | None = None
-    logit_bias: list | None = None  # todo: type this correctly
-    n_probs: int | None = None
-    min_keep: int | None = None
-    image_data: list | None = None
-    id_slot: int | None = None
-    samplers: list[str] | None = None
 
 
 @dataclass
 class LlamaInfillRequest(ToJson, ToDict):
     input_prefix: str
     input_suffix: str
-    system_prompt: str | None = None
-    stop: list[str] | None = None
     cache_prompt: bool | None = None
-    temperature: float | None = None
-    dynatemp_range: float | None = None
     dynatemp_exponent: float | None = None
+    dynatemp_range: float | None = None
+    frequency_penalty: float | None = None
+    grammar: object | None = None  # todo: type this correctly
+    id_slot: int | None = None
+    ignore_eos: bool | None = None
+    image_data: list | None = None
+    json_schema: dict[str, object] | list[str] | None = None
+    logit_bias: list | None = None  # todo: type this correctly
+    min_keep: int | None = None
+    min_p: float | None = None
+    mirostat: int | None = None
+    mirostat_eta: float | None = None
+    mirostat_tau: float | None = None
+    n_keep: int | None = None
+    n_predict: int | None = None
+    n_probs: int | None = None
+    penalize_nl: bool | None = None
+    penalty_prompt: LlamaPrompt | None = None
+    presence_penalty: float | None = None
+    repeat_last_n: int | None = None
+    repeat_penalty: float | None = None
+    samplers: list[str] | None = None
+    seed: int | None = None
+    stop: list[str] | None = None
+    system_prompt: str | None = None
+    temperature: float | None = None
+    tfs_z: float | None = None
     top_k: int | None = None
     top_p: float | None = None
-    min_p: float | None = None
-    n_predict: int | None = None
-    n_keep: int | None = None
-    tfs_z: float | None = None
     typical_p: float | None = None
-    repeat_penalty: float | None = None
-    repeat_last_n: int | None = None
-    penalize_nl: bool | None = None
-    presence_penalty: float | None = None
-    frequency_penalty: float | None = None
-    penalty_prompt: LlamaPrompt | None = None
-    mirostat: int | None = None
-    mirostat_tau: float | None = None
-    mirostat_eta: float | None = None
-    grammar: object | None = None  # todo: type this correctly
-    json_schema: dict[str, object] | list[str] | None = None
-    seed: int | None = None
-    ignore_eos: bool | None = None
-    logit_bias: list | None = None  # todo: type this correctly
-    n_probs: int | None = None
-    min_keep: int | None = None
-    image_data: list | None = None
-    id_slot: int | None = None
-    samplers: list[str] | None = None
 
 
 # response data types
@@ -130,117 +130,103 @@ class LlamaInfillRequest(ToJson, ToDict):
 @dataclass(frozen=True)
 class LlamaNextToken(FromJson):
     has_next_token: bool
-    n_remain: int
     n_decoded: int
+    n_remain: int
     stopped_eos: bool
-    stopped_word: bool
     stopped_limit: bool
+    stopped_word: bool
     stopping_word: str
 
 
 @dataclass(frozen=True)
 class LlamaSlot(FromJson):
-    n_ctx: int
-    n_predict: int
-    max_tokens: int
-    model: str
-    seed: int
-    temperature: float
-    dynatemp_range: float
     dynatemp_exponent: float
-    top_k: int
-    top_p: float
-    min_p: float
-    tfs_z: float
-    typical_p: float
-    repeat_last_n: int
-    repeat_penalty: float
-    presence_penalty: float
+    dynatemp_range: float
     frequency_penalty: float
-    penalty_prompt_tokens: list
-    use_penalty_prompt_tokens: bool
-    mirostat: int
-    mirostat_tau: float
-    mirostat_eta: float
-    penalize_nl: bool
-    stop: list[str]
-    n_keep: int
-    n_discard: int
-    ignore_eos: bool
-    stream: bool
-    logit_bias: list
-    n_probs: int
-    min_keep: int
     grammar: str
-    samplers: list[str]
     id: int
     id_task: int
-    state: int
-    prompt: str
+    ignore_eos: bool
+    logit_bias: list
+    max_tokens: int
+    min_keep: int
+    min_p: float
+    mirostat: int
+    mirostat_eta: float
+    mirostat_tau: float
+    model: str
+    n_ctx: int
+    n_discard: int
+    n_keep: int
+    n_predict: int
+    n_probs: int
     next_token: LlamaNextToken
-
-
-@dataclass(frozen=True)
-class LlamaHealth(FromJson):
-    status: str
-    slots_idle: int | None = None
-    slots_processing: int | None = None
-    slots: list[LlamaSlot] | None = None
-
-    @classmethod
-    def from_json(cls, data: dict) -> Self:
-        if "slots" in data:
-            data["slots"] = [LlamaSlot.from_json(slot) for slot in data["slots"]]
-        return super().from_json(data)
+    penalize_nl: bool
+    penalty_prompt_tokens: list
+    presence_penalty: float
+    prompt: str
+    repeat_last_n: int
+    repeat_penalty: float
+    samplers: list[str]
+    seed: int
+    state: int
+    stop: list[str]
+    stream: bool
+    temperature: float
+    tfs_z: float
+    top_k: int
+    top_p: float
+    typical_p: float
+    use_penalty_prompt_tokens: bool
 
 
 @dataclass(frozen=True)
 class LlamaGenerationSettings(FromJson):
-    n_ctx: int
-    n_predict: int
-    max_tokens: int
-    model: str
-    seed: int
-    temperature: float
-    dynatemp_range: float
     dynatemp_exponent: float
-    top_k: int
-    top_p: float
+    dynatemp_range: float
+    frequency_penalty: float
+    grammar: str
+    ignore_eos: bool
+    logit_bias: list
+    max_tokens: int
+    min_keep: int
     min_p: float
-    tfs_z: float
-    typical_p: float
+    mirostat: int
+    mirostat_eta: float
+    mirostat_tau: float
+    model: str
+    n_ctx: int
+    n_discard: int
+    n_keep: int
+    n_predict: int
+    n_probs: int
+    penalize_nl: bool
+    penalty_prompt_tokens: list
+    presence_penalty: float
     repeat_last_n: int
     repeat_penalty: float
-    presence_penalty: float
-    frequency_penalty: float
-    penalty_prompt_tokens: list
-    use_penalty_prompt_tokens: bool
-    mirostat: int
-    mirostat_tau: float
-    mirostat_eta: float
-    penalize_nl: bool
-    stop: list[str]
-    n_keep: int
-    n_discard: int
-    ignore_eos: bool
-    stream: bool
-    logit_bias: list
-    n_probs: int
-    min_keep: int
-    grammar: str
     samplers: list[str]
+    seed: int
+    stop: list[str]
+    stream: bool
+    temperature: float
+    tfs_z: float
+    top_k: int
+    top_p: float
+    typical_p: float
+    use_penalty_prompt_tokens: bool
 
 
 @dataclass(frozen=True)
 class LlamaTimings(FromJson):
-    prompt_n: int
-    prompt_ms: float
-    prompt_per_token_ms: float
-    prompt_per_second: float
-    predicted_n: int
     predicted_ms: float
-    predicted_per_token_ms: float
+    predicted_n: int
     predicted_per_second: float
+    predicted_per_token_ms: float
+    prompt_ms: float
+    prompt_n: int
+    prompt_per_second: float
+    prompt_per_token_ms: float
 
 
 type LlamaError = str
@@ -251,19 +237,19 @@ class LlamaCompletionResponse(FromJson):
     content: str
     id_slot: int
     stop: bool
-    multimodal: str | None = None
-    model: str | None = None
-    tokens_predicted: int | None = None
-    tokens_evaluated: int | None = None
     generation_settings: LlamaGenerationSettings | None = None
+    model: str | None = None
+    multimodal: str | None = None
     prompt: str | None = None
-    truncated: bool | None = None
     stopped_eos: bool | None = None
-    stopped_word: bool | None = None
     stopped_limit: bool | None = None
+    stopped_word: bool | None = None
     stopping_word: str | None = None
-    tokens_cached: int | None = None
     timings: LlamaTimings | None = None
+    tokens_cached: int | None = None
+    tokens_evaluated: int | None = None
+    tokens_predicted: int | None = None
+    truncated: bool | None = None
 
     @classmethod
     def from_json(cls, data: dict) -> Self:
@@ -304,9 +290,9 @@ class UnreasonableLlama:
     def close(self) -> None:
         self.client.close()
 
-    def get_health(self, include_slots: bool = False) -> LlamaHealth:
-        response = self.client.get("health", params="include_slots" if include_slots else "").json()
-        return LlamaHealth.from_json(response)
+    def is_alive(self) -> bool:
+        response = self.client.get("health").json()
+        return "status" in response and "error" not in response and response["status"] == "ok"
 
     def get_completion(self, request: LlamaCompletionRequest) -> LlamaCompletionResponse:
         request_dict = request.to_dict()
