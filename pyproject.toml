@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "unreasonable-llama"
-version = "0.2.5"
+version = "0.2.6"
 description = "HTTP API bindings for llama.cpp built-in server"
 authors = ["SteelPh0enix <wojciech_olech@hotmail.com>"]
 readme = "README.md"
