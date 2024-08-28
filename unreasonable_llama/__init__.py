@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import os
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncIterator
 from dataclasses import asdict, dataclass
 from typing import Self
 
@@ -302,7 +302,7 @@ class UnreasonableLlama:
         response = self.client.post("completions", data=request_json)  # type: ignore
         return LlamaCompletionResponse.from_json(response.json())
 
-    async def get_streamed_completion(self, request: LlamaCompletionRequest) -> AsyncGenerator:
+    async def get_streamed_completion(self, request: LlamaCompletionRequest) -> AsyncIterator[LlamaCompletionResponse]:
         request_dict = request.to_dict()
         request_dict["stream"] = True
         request_json = json.dumps(request_dict)
@@ -321,7 +321,7 @@ class UnreasonableLlama:
         response = self.client.post("infill", data=request_json)  # type: ignore
         return LlamaCompletionResponse.from_json(response.json())
 
-    async def get_streamed_infill(self, request: LlamaInfillRequest) -> AsyncGenerator:
+    async def get_streamed_infill(self, request: LlamaInfillRequest) -> AsyncIterator[LlamaCompletionResponse]:
         request_dict = request.to_dict()
         request_dict["stream"] = True
         request_json = json.dumps(request_dict)
