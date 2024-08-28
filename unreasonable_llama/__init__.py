@@ -294,6 +294,10 @@ class UnreasonableLlama:
         response = self.client.get("health").json()
         return "status" in response and "error" not in response and response["status"] == "ok"
 
+    def slots(self) -> list[LlamaSlot]:
+        response = self.client.get("slots").json()
+        return [LlamaSlot.from_json(slot) for slot in response]
+
     def get_completion(self, request: LlamaCompletionRequest) -> LlamaCompletionResponse:
         request_dict = request.to_dict()
         request_dict["stream"] = False

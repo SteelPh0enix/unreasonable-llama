@@ -19,6 +19,9 @@ try:
     # you can use `is_alive()` to check server connection
     if llama.is_alive():
         print("llama server is alive!")
+        print("slots:")
+        for slot in llama.slots():
+            print(slot)
     else:
         print("llama server is not alive, quitting!")
         sys.exit(1)
