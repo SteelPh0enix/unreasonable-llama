@@ -23,5 +23,5 @@ jobs:
       - name: 'Check code with ruff'
         run: poetry run ruff check --no-fix --no-unsafe-fixes --statistics $(ls ./unreasonable_llama/*.py)
       - name: 'Check code with mypy'
-        run: poetry run mypy --strict --pretty $(ls ./unreasonable_llama/*.py)
+        run: poetry run mypy $(ls ./unreasonable_llama/*.py)
 

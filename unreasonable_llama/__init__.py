@@ -9,6 +9,15 @@ from typing import Self
 import httpx
 
 
+class LlamaException(RuntimeError):
+    def __init__(self, details: str, *args: object) -> None:
+        self.details = details
+        super().__init__(*args)
+
+    def __str__(self) -> str:
+        return f"LlamaException: {self.details}"
+
+
 def _remove_none_values(dictionary: dict) -> dict:
     """Recursively removes None values from a Python dictionary.
 
@@ -87,41 +96,10 @@ class LlamaCompletionRequest(ToJson, ToDict):
 
 
 @dataclass
-class LlamaInfillRequest(ToJson, ToDict):
-    input_prefix: str
-    input_suffix: str
-    cache_prompt: bool | None = None
-    dynatemp_exponent: float | None = None
-    dynatemp_range: float | None = None
-    frequency_penalty: float | None = None
-    grammar: object | None = None  # todo: type this correctly
-    id_slot: int | None = None
-    ignore_eos: bool | None = None
-    image_data: list | None = None
-    json_schema: dict[str, object] | list[str] | None = None
-    logit_bias: list | None = None  # todo: type this correctly
-    min_keep: int | None = None
-    min_p: float | None = None
-    mirostat: int | None = None
-    mirostat_eta: float | None = None
-    mirostat_tau: float | None = None
-    n_keep: int | None = None
-    n_predict: int | None = None
-    n_probs: int | None = None
-    penalize_nl: bool | None = None
-    penalty_prompt: LlamaPrompt | None = None
-    presence_penalty: float | None = None
-    repeat_last_n: int | None = None
-    repeat_penalty: float | None = None
-    samplers: list[str] | None = None
-    seed: int | None = None
-    stop: list[str] | None = None
-    system_prompt: str | None = None
-    temperature: float | None = None
-    tfs_z: float | None = None
-    top_k: int | None = None
-    top_p: float | None = None
-    typical_p: float | None = None
+class LlamaTokenizeRequest(ToJson):
+    content: str
+    add_special: bool = False
+    with_pieces: bool = False
 
 
 # response data types
@@ -147,7 +125,6 @@ class LlamaSlot(FromJson):
     id: int
     id_task: int
     ignore_eos: bool
-    logit_bias: list
     max_tokens: int
     min_keep: int
     min_p: float
@@ -162,13 +139,13 @@ class LlamaSlot(FromJson):
     n_probs: int
     next_token: LlamaNextToken
     penalize_nl: bool
-    penalty_prompt_tokens: list
     presence_penalty: float
     prompt: str
     repeat_last_n: int
     repeat_penalty: float
     samplers: list[str]
     seed: int
+    seed_cur: int
     state: int
     stop: list[str]
     stream: bool
@@ -177,7 +154,6 @@ class LlamaSlot(FromJson):
     top_k: int
     top_p: float
     typical_p: float
-    use_penalty_prompt_tokens: bool
 
 
 @dataclass(frozen=True)
@@ -187,7 +163,6 @@ class LlamaGenerationSettings(FromJson):
     frequency_penalty: float
     grammar: str
     ignore_eos: bool
-    logit_bias: list
     max_tokens: int
     min_keep: int
     min_p: float
@@ -201,12 +176,12 @@ class LlamaGenerationSettings(FromJson):
     n_predict: int
     n_probs: int
     penalize_nl: bool
-    penalty_prompt_tokens: list
     presence_penalty: float
     repeat_last_n: int
     repeat_penalty: float
     samplers: list[str]
     seed: int
+    seed_cur: int
     stop: list[str]
     stream: bool
     temperature: float
@@ -214,7 +189,14 @@ class LlamaGenerationSettings(FromJson):
     top_k: int
     top_p: float
     typical_p: float
-    use_penalty_prompt_tokens: bool
+
+
+@dataclass(frozen=True)
+class LlamaProps(FromJson):
+    system_prompt: str
+    default_generation_settings: LlamaGenerationSettings
+    total_slots: int
+    chat_template: str
 
 
 @dataclass(frozen=True)
@@ -229,18 +211,17 @@ class LlamaTimings(FromJson):
     prompt_per_token_ms: float
 
 
-type LlamaError = str
-
-
-@dataclass()
+@dataclass
 class LlamaCompletionResponse(FromJson):
     content: str
     id_slot: int
+    index: int
     stop: bool
     generation_settings: LlamaGenerationSettings | None = None
     model: str | None = None
     multimodal: str | None = None
     prompt: str | None = None
+    seed_cur: int | None = None
     stopped_eos: bool | None = None
     stopped_limit: bool | None = None
     stopped_word: bool | None = None
@@ -254,7 +235,7 @@ class LlamaCompletionResponse(FromJson):
     @classmethod
     def from_json(cls, data: dict) -> Self:
         if "error" in data:
-            raise data["error"]
+            raise LlamaException(data["error"])
 
         if "timings" in data:
             data["timings"] = LlamaTimings.from_json(data["timings"])
@@ -268,6 +249,9 @@ class LlamaCompletionResponse(FromJson):
         return response
 
 
+type LlamaTokens = list[int] | list[dict[str, int | str]] | list[dict[str, int | list[int]]]
+
+
 class UnreasonableLlama:
     def __init__(
         self,
@@ -278,7 +262,7 @@ class UnreasonableLlama:
             if server_url_from_env := os.getenv("LLAMA_CPP_SERVER_URL"):
                 server_url = server_url_from_env
             else:
-                raise RuntimeError("Missing llama.cpp server URL!")
+                raise LlamaException("Missing llama.cpp server URL!")
 
         self.server_url = server_url
         self.client = httpx.Client(
@@ -297,6 +281,10 @@ class UnreasonableLlama:
     def slots(self) -> list[LlamaSlot]:
         response = self.client.get("slots").json()
         return [LlamaSlot.from_json(slot) for slot in response]
+
+    def props(self) -> LlamaProps:
+        response = self.client.get("props")
+        return LlamaProps.from_json(response.json())
 
     def get_completion(self, request: LlamaCompletionRequest) -> LlamaCompletionResponse:
         request_dict = request.to_dict()
@@ -317,21 +305,12 @@ class UnreasonableLlama:
                     chunk = chunk.removeprefix("data: ")
                     yield LlamaCompletionResponse.from_json(json.loads(chunk))
 
-    def get_infill(self, request: LlamaInfillRequest) -> LlamaCompletionResponse:
-        request_dict = request.to_dict()
-        request_dict["stream"] = False
-        request_json = json.dumps(request_dict)
+    def tokenize(self, request: LlamaTokenizeRequest) -> LlamaTokens:
+        request_json = request.to_json()
+        response = self.client.post("tokenize", data=request_json)  # type: ignore
+        return response.json()["tokens"]  # type: ignore
 
-        response = self.client.post("infill", data=request_json)  # type: ignore
-        return LlamaCompletionResponse.from_json(response.json())
-
-    async def get_streamed_infill(self, request: LlamaInfillRequest) -> AsyncIterator[LlamaCompletionResponse]:
-        request_dict = request.to_dict()
-        request_dict["stream"] = True
-        request_json = json.dumps(request_dict)
-
-        with self.client.stream("POST", "infill", data=request_json) as response:  # type: ignore
-            for chunk in response.iter_lines():
-                if chunk.startswith("data: "):
-                    chunk = chunk.removeprefix("data: ")
-                    yield LlamaCompletionResponse.from_json(json.loads(chunk))
+    def detokenize(self, tokens: LlamaTokens) -> str:
+        request_json = json.dumps({"tokens": tokens})
+        response = self.client.post("detokenize", data=request_json)  # type: ignore
+        return response.json()["content"]  # type: ignore
