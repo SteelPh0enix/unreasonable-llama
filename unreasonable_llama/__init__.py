@@ -116,7 +116,7 @@ class LlamaNextToken(FromJson):
     stopping_word: str
 
 
-@dataclass(frozen=True)
+@dataclass()
 class LlamaSlot(FromJson):
     dynatemp_exponent: float
     dynatemp_range: float
@@ -155,6 +155,12 @@ class LlamaSlot(FromJson):
     top_p: float
     typical_p: float
 
+    @classmethod
+    def from_json(cls, data: dict) -> Self:
+        response = super().from_json(data)
+        response.next_token = LlamaNextToken.from_json(data["next_token"])
+        return response
+
 
 @dataclass(frozen=True)
 class LlamaGenerationSettings(FromJson):
@@ -191,12 +197,18 @@ class LlamaGenerationSettings(FromJson):
     typical_p: float
 
 
-@dataclass(frozen=True)
+@dataclass()
 class LlamaProps(FromJson):
     system_prompt: str
     default_generation_settings: LlamaGenerationSettings
     total_slots: int
     chat_template: str
+
+    @classmethod
+    def from_json(cls, data: dict) -> Self:
+        response = super().from_json(data)
+        response.default_generation_settings = LlamaGenerationSettings.from_json(data["default_generation_settings"])
+        return response
 
 
 @dataclass(frozen=True)

@@ -1,6 +1,7 @@
 import asyncio
 import sys
 from typing import cast
+from pprint import pprint
 
 import httpx
 
@@ -24,10 +25,12 @@ try:
         print("llama server is alive!")
         print("slots:")
         for slot in llama.slots():
-            print(slot)
+            pprint(slot)
 
+        props = llama.props()
+        print(f"Loaded model: {props.default_generation_settings.model}")
         print("\nprops:")
-        print(llama.props())
+        pprint(props)
     else:
         print("llama server is not alive, quitting!")
         sys.exit(1)
