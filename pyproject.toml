@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "unreasonable-llama"
-version = "0.3.0"
+version = "0.3.1"
 description = "HTTP API bindings for llama.cpp built-in server"
 authors = ["SteelPh0enix <wojciech_olech@hotmail.com>"]
 readme = "README.md"
@@ -10,15 +10,12 @@ keywords = ["llama.cpp", "llama", "llm", "api", "bindings"]
 
 [tool.poetry.dependencies]
 python = "^3.12"
-httpx = "^0.27.0"
+httpx = "^0.27.2"
 
 [tool.poetry.group.dev.dependencies]
-numpy = "^2.0.1"
-sentencepiece = "^0.2.0"
-pyyaml = "^6.0.2"
-ruff = "^0.5.5"
-ruff-lsp = "^0.0.54"
-mypy = "^1.11.0"
+ruff = "^0.6.7"
+ruff-lsp = "^0.0.57"
+mypy = "^1.11.2"
 
 [tool.ruff]
 line-length = 120
