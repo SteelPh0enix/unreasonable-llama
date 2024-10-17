@@ -1,15 +1,260 @@
+"""
+llama.cpp typed python bindings
+
+* stateless
+* fully typed
+* uses the same env variables as llama.cpp server (listed below)
+
+If server's host/port is not specified, following environmental variables are
+used instead:
+    * `LLAMA_ARG_HOST`
+    * `LLAMA_ARG_PORT`
+
+This library is still WIP and v0.x, major rewrites should be expected between
+minor releases.
+I'm trying to keep it up-to-date with llama.cpp master, but on major changes
+it usually takes me a while to notice and fix stuff - PRs are welcome!
+
+Currently supported endpoints (methods) [functions that support them]:
+    * `/health` (GET) [health()]
+    * `/props` (GET) [props()]
+    * `/models` (GET) [models()]
+    * `/completions` (POST) [complete(prompt), streamed_complete(prompt)]
+    * `/tokenize` (POST) [tokenize(raw_prompt)]
+    * `/detokenize` (POST) [detokenize(tokenized_prompt)]
+    * `/slots` (GET) [slots()]
+
+Note: `complete` and `streamed_complete` accept both tokenized and raw prompt.
+
+This librarty uses `httpx`. In case of connection issues, expect
+`httpx.ConnectError` to happen.
+
+Authenthication and error handling is not implemented yet.
+
+I develop this library mostly for myself - if you want to see more endpoints
+supported, make PRs. Don't forget about pre-commit checks.
+"""
+
 from __future__ import annotations
 
-import json
 import os
-from collections.abc import AsyncIterator
-from dataclasses import asdict, dataclass
-from typing import Self
+from dataclasses import dataclass
+from datetime import datetime
+from enum import IntEnum
 
 import httpx
 
 
+@dataclass(frozen=True)
+class LlamaGenerationSettings:
+    """LLM generation settings"""
+
+    n_ctx: int
+    """Context length"""
+    n_predict: int
+    """Amount of tokens to predict"""
+    model: str
+    """Model name"""
+    seed: int
+    """Seed used for RNG"""
+    seed_cur: int
+    temperature: float
+    """Temperature controls the probability distribution of tokens selected by LLM.
+    Temperature shouldn't be below 0."""
+    dynatemp_range: float
+    """Dynamic temperature range, if non-zero, defines the range of temperature used during token prediction.
+    Final temperature will be applied based on tokens entropy."""
+    dynatemp_exponent: float
+    """Dynamic temperature exponent, 1 by default"""
+    top_k: int
+    """Top-K sampling limits the number of tokens considered during prediction to specified value."""
+    top_p: float
+    """Top-P sampling limits the number of tokens considered during prediction based on their cumulative probability."""
+    min_p: float
+    """Min-P defines the minimum probability of token to be considered during prediction."""
+    xtc_probability: float
+    """This parameter tweaks the chance of XTC sampling happening."""
+    xtc_threshold: float
+    """XTC removes tokens with probability above specified threshold, except least probable one of them."""
+    tfs_z: float
+    """Tail-free sampling removes the tokens with less-than-desired second derivative of it's probability.
+    This parameter defines the probability in (0, 1] range, where 1 == TFS disabled."""
+    typical_p: float
+    """Locally typical sampling can increase diversity of the text without major coherence degradation by choosing tokens that are typical or expected based on the context.
+    This parameter defines probability in range (0, 1], where 1 == locally typical sampling disabled."""
+    repeat_last_n: int
+    """Amount of last tokens to penalize for repetition. Setting this to 0 disabled penalization, and -1 penalizes the whole context."""
+    repeat_penalty: float
+    """Penalty for repeating the tokens in generated text."""
+    presence_penalty: float
+    """Penalty for re-using the tokens that are already present in generated text. 0 == presence penalty disabled."""
+    frequency_penalty: float
+    """Penalty applied for re-using the tokens that are already present in generated text, based on the frequency of their appearance. 0 == frequency penalty disabled."""
+    mirostat: int
+    """Mirostat type, 1 - Mirostat, 2 - Mirostat 2.0, 0 - disabled.
+    ENABLING MIROSTAT DISABLES OTHER SAMPLERS!"""
+    mirostat_tau: float
+    """Mirostat target entropy, desired perplexity for generated text."""
+    mirostat_eta: float
+    """Mirostat learning rate."""
+    penalize_nl: bool
+    """Penalize newline tokens?"""
+    stop: list[str]
+    """List of strings stopping the generation."""
+    max_tokens: int
+    """Maximum amount of generated tokens."""
+    n_keep: int
+    """Amount of tokens to keep from initial prompt when context is filled and it shifts."""
+    n_discard: int
+    """Number of tokens after n_keep that may be discarded when shifront context, 0 default to half."""
+    ignore_eos: bool
+    """Ignore end-of-sentence token?"""
+    stream: bool
+    """Is completion streamed?"""
+    n_probs: int
+    """If greater than 0, llama.cpp server will output the probabilities of top n_probs tokens.
+    Not supported yet. Keep at 0."""
+    min_keep: int
+    """If greater than 0, forces the sampler to return at least min_keep tokens."""
+    grammar: str
+    """Custom, optional BNF-like grammar to constrain sampling."""
+    samplers: list[str]
+    """List of used samplers in order."""
+
+    @staticmethod
+    def from_llama_cpp_response(response: dict) -> LlamaGenerationSettings:
+        """hard-coded converstion from JSON to LlamaGenerationSettings"""
+        return LlamaGenerationSettings(
+            n_ctx=response["n_ctx"],
+            n_predict=response["n_predict"],
+            model=response["model"],
+            seed=response["seed"],
+            seed_cur=response["seed_cur"],
+            temperature=response["temperature"],
+            dynatemp_range=response["dynatemp_range"],
+            dynatemp_exponent=response["dynatemp_exponent"],
+            top_k=response["top_k"],
+            top_p=response["top_p"],
+            min_p=response["min_p"],
+            xtc_probability=response["xtc_probability"],
+            xtc_threshold=response["xtc_threshold"],
+            tfs_z=response["tfs_z"],
+            typical_p=response["typical_p"],
+            repeat_last_n=response["repeat_last_n"],
+            repeat_penalty=response["repeat_penalty"],
+            presence_penalty=response["presence_penalty"],
+            frequency_penalty=response["frequency_penalty"],
+            mirostat=response["mirostat"],
+            mirostat_tau=response["mirostat_tau"],
+            mirostat_eta=response["mirostat_eta"],
+            penalize_nl=response["penalize_nl"],
+            stop=response["stop"],
+            max_tokens=response["max_tokens"],
+            n_keep=response["n_keep"],
+            n_discard=response["n_discard"],
+            ignore_eos=response["ignore_eos"],
+            stream=response["stream"],
+            n_probs=response["n_probs"],
+            min_keep=response["min_keep"],
+            grammar=response["grammar"],
+            samplers=response["samplers"],
+        )
+
+
+@dataclass(frozen=True)
+class LlamaProps:
+    """llama.cpp server properties."""
+
+    default_generation_settings: LlamaGenerationSettings
+    """Default generation settings for currently loaded model."""
+    total_slots: int
+    """Amount of slots supported by the server."""
+    chat_template: str
+    """Chat template for currently loaded model."""
+
+    @staticmethod
+    def from_llama_cpp_response(response: dict) -> LlamaProps:
+        """hard-coded converstion from JSON to LlamaProps"""
+        generation_settings = LlamaGenerationSettings.from_llama_cpp_response(response["default_generation_settings"])
+        return LlamaProps(
+            default_generation_settings=generation_settings,
+            total_slots=response["total_slots"],
+            chat_template=response["chat_template"],
+        )
+
+
+class LlamaVocabType(IntEnum):
+    """llama.cpp vocabulary type"""
+
+    NONE = 0
+    """For models without vocab"""
+    SPM = 1
+    """LlaMA tokenizer based on byte-level BPE with byte fallback"""
+    BPE = 2
+    """GPT-2 tokenizer based on byte-level BPE"""
+    WPM = 3
+    """BERT tokenizer based on WordPiece"""
+    UGM = 4
+    """T5 tokenizer based on Unigram"""
+    RWKV = 5
+    """RWKV tokenizer based on greedy tokenization"""
+
+
+@dataclass(frozen=True)
+class LlamaModelMeta:
+    """llama.cpp model metadata"""
+
+    vocab_type: LlamaVocabType
+    """Vocabulary type"""
+    n_vocab: int
+    """Vocabulary length"""
+    n_ctx_size: int
+    """Context size the model was trained on"""
+    n_embd: int
+    """Embeddings output length"""
+    n_params: int
+    """Number of parameters"""
+    size: int
+    """Size"""
+
+    @staticmethod
+    def from_llama_cpp_response(response: dict) -> LlamaModelMeta:
+        """hard-coded converstion from JSON to LlamaModelMeta"""
+        return LlamaModelMeta(
+            vocab_type=LlamaVocabType(response["vocab_type"]),
+            n_vocab=response["n_vocab"],
+            n_ctx_size=response["n_ctx_train"],
+            n_embd=response["n_embd"],
+            n_params=response["n_params"],
+            size=response["size"],
+        )
+
+
+@dataclass(frozen=True)
+class LlamaModel:
+    """llama.cpp model"""
+
+    id: str
+    """ID (model's alias)"""
+    created: datetime
+    """Creation date"""
+    meta: LlamaModelMeta
+    """Metadata"""
+
+    @staticmethod
+    def from_llama_cpp_response(response: dict) -> LlamaModel:
+        """hard-coded converstion from JSON to LlamaModel"""
+        return LlamaModel(
+            id=response["id"],
+            created=datetime.fromtimestamp(response["created"]),
+            meta=LlamaModelMeta.from_llama_cpp_response(response["meta"]),
+        )
+
+
 class LlamaException(RuntimeError):
+    """llama.cpp base exception, should be subclassed if more details
+    useful to the user can be provided."""
+
     def __init__(self, details: str, *args: object) -> None:
         self.details = details
         super().__init__(*args)
@@ -18,311 +263,56 @@ class LlamaException(RuntimeError):
         return f"LlamaException: {self.details}"
 
 
-def _remove_none_values(dictionary: dict) -> dict:
-    """Recursively removes None values from a Python dictionary.
+class LlamaUrlException(LlamaException):
+    """Exception thrown in case of invalid/unknown URL of llama.cpp server"""
 
-    Args:
-      dictionary: The dictionary to remove None values from.
-
-    Returns:
-      A new dictionary with all None values removed.
-    """
-
-    new_dict = {}
-    for key, value in dictionary.items():
-        if isinstance(value, dict):
-            new_dict[key] = _remove_none_values(value)
-        elif value is not None:
-            new_dict[key] = value
-    return new_dict
+    def __init__(self, details: str, host: str | None, port: int | None, *args: object) -> None:
+        self.host = host
+        self.port = port
+        super().__init__(f"{details} (server's host:port -> {host}:{port})", *args)
 
 
-class ToJson:
-    def to_json(self) -> str:
-        return json.dumps(_remove_none_values(asdict(self)))  # type: ignore
+def _make_llama_server_url(host: str | None, port: int | None) -> str:
+    """creates llama.cpp server URL out of host/port, if not provided - will
+    try to fetch them from environment. Validates the port range."""
+    if host is None:
+        if env_host := os.getenv("LLAMA_ARG_HOST"):
+            host = env_host
+        else:
+            raise LlamaUrlException("Unknown llama.cpp server host!", host, port)
+
+    if port is None:
+        if env_port := os.getenv("LLAMA_ARG_PORT"):
+            port = int(env_port)
+        else:
+            raise LlamaUrlException("Unknown llama.cpp server port!", host, port)
+
+    if port <= 0 or port > 65535:
+        raise LlamaUrlException("Invalid llama.cpp server port!", host, port)
+
+    return f"http://{host}:{port}"
 
 
-class ToDict:
-    def to_dict(self) -> dict:
-        return _remove_none_values(asdict(self))  # type: ignore
+def health(server_host: str | None = None, server_port: int | None = None) -> bool:
+    """Returns `True` if server is alive and ready, `False` if it's not ready"""
+    server_url = _make_llama_server_url(server_host, server_port)
+    response = httpx.get(f"{server_url}/health").json()
+    return response.get("status", "") == "ok"
 
 
-class FromJson:
-    @classmethod
-    def from_json(cls, data: dict) -> Self:
-        return cls(**data)
+def props(server_host: str | None = None, server_port: int | None = None) -> LlamaProps:
+    """Returns server properties"""
+    server_url = _make_llama_server_url(server_host, server_port)
+    response = httpx.get(f"{server_url}/props").json()
+    return LlamaProps.from_llama_cpp_response(response)
 
 
-# request data types
-
-type LlamaPrompt = str | list[str] | list[int]
-
-
-@dataclass
-class LlamaCompletionRequest(ToJson, ToDict):
-    prompt: LlamaPrompt
-    cache_prompt: bool | None = None
-    dynatemp_exponent: float | None = None
-    dynatemp_range: float | None = None
-    frequency_penalty: float | None = None
-    grammar: object | None = None  # todo: type this correctly
-    id_slot: int | None = None
-    ignore_eos: bool | None = None
-    image_data: list | None = None
-    json_schema: dict[str, object] | list[str] | None = None
-    logit_bias: list | None = None  # todo: type this correctly
-    min_keep: int | None = None
-    min_p: float | None = None
-    mirostat: int | None = None
-    mirostat_eta: float | None = None
-    mirostat_tau: float | None = None
-    n_keep: int | None = None
-    n_predict: int | None = None
-    n_probs: int | None = None
-    penalize_nl: bool | None = None
-    penalty_prompt: LlamaPrompt | None = None
-    presence_penalty: float | None = None
-    repeat_last_n: int | None = None
-    repeat_penalty: float | None = None
-    samplers: list[str] | None = None
-    seed: int | None = None
-    stop: list[str] | None = None
-    system_prompt: str | None = None
-    temperature: float | None = None
-    tfs_z: float | None = None
-    top_k: int | None = None
-    top_p: float | None = None
-    typical_p: float | None = None
+def models(server_host: str | None = None, server_port: int | None = None) -> list[LlamaModel]:
+    """Returns list of currently loaded models"""
+    server_url = _make_llama_server_url(server_host, server_port)
+    response = httpx.get(f"{server_url}/models").json()
+    return [LlamaModel.from_llama_cpp_response(model) for model in response["data"]]
 
 
-@dataclass
-class LlamaTokenizeRequest(ToJson):
-    content: str
-    add_special: bool = False
-    with_pieces: bool = False
-
-
-# response data types
-
-
-@dataclass(frozen=True)
-class LlamaNextToken(FromJson):
-    has_next_token: bool
-    n_decoded: int
-    n_remain: int
-    stopped_eos: bool
-    stopped_limit: bool
-    stopped_word: bool
-    stopping_word: str
-
-
-@dataclass()
-class LlamaSlot(FromJson):
-    dynatemp_exponent: float
-    dynatemp_range: float
-    frequency_penalty: float
-    grammar: str
-    id: int
-    id_task: int
-    ignore_eos: bool
-    max_tokens: int
-    min_keep: int
-    min_p: float
-    mirostat: int
-    mirostat_eta: float
-    mirostat_tau: float
-    model: str
-    n_ctx: int
-    n_discard: int
-    n_keep: int
-    n_predict: int
-    n_probs: int
-    next_token: LlamaNextToken
-    penalize_nl: bool
-    presence_penalty: float
-    prompt: str
-    repeat_last_n: int
-    repeat_penalty: float
-    samplers: list[str]
-    seed: int
-    seed_cur: int
-    state: int
-    stop: list[str]
-    stream: bool
-    temperature: float
-    tfs_z: float
-    top_k: int
-    top_p: float
-    typical_p: float
-
-    @classmethod
-    def from_json(cls, data: dict) -> Self:
-        response = super().from_json(data)
-        response.next_token = LlamaNextToken.from_json(data["next_token"])
-        return response
-
-
-@dataclass(frozen=True)
-class LlamaGenerationSettings(FromJson):
-    dynatemp_exponent: float
-    dynatemp_range: float
-    frequency_penalty: float
-    grammar: str
-    ignore_eos: bool
-    max_tokens: int
-    min_keep: int
-    min_p: float
-    mirostat: int
-    mirostat_eta: float
-    mirostat_tau: float
-    model: str
-    n_ctx: int
-    n_discard: int
-    n_keep: int
-    n_predict: int
-    n_probs: int
-    penalize_nl: bool
-    presence_penalty: float
-    repeat_last_n: int
-    repeat_penalty: float
-    samplers: list[str]
-    seed: int
-    seed_cur: int
-    stop: list[str]
-    stream: bool
-    temperature: float
-    tfs_z: float
-    top_k: int
-    top_p: float
-    typical_p: float
-
-
-@dataclass()
-class LlamaProps(FromJson):
-    system_prompt: str
-    default_generation_settings: LlamaGenerationSettings
-    total_slots: int
-    chat_template: str
-
-    @classmethod
-    def from_json(cls, data: dict) -> Self:
-        response = super().from_json(data)
-        response.default_generation_settings = LlamaGenerationSettings.from_json(data["default_generation_settings"])
-        return response
-
-
-@dataclass(frozen=True)
-class LlamaTimings(FromJson):
-    predicted_ms: float
-    predicted_n: int
-    predicted_per_second: float
-    predicted_per_token_ms: float
-    prompt_ms: float
-    prompt_n: int
-    prompt_per_second: float
-    prompt_per_token_ms: float
-
-
-@dataclass
-class LlamaCompletionResponse(FromJson):
-    content: str
-    id_slot: int
-    index: int
-    stop: bool
-    generation_settings: LlamaGenerationSettings | None = None
-    model: str | None = None
-    multimodal: str | None = None
-    prompt: str | None = None
-    seed_cur: int | None = None
-    stopped_eos: bool | None = None
-    stopped_limit: bool | None = None
-    stopped_word: bool | None = None
-    stopping_word: str | None = None
-    timings: LlamaTimings | None = None
-    tokens_cached: int | None = None
-    tokens_evaluated: int | None = None
-    tokens_predicted: int | None = None
-    truncated: bool | None = None
-
-    @classmethod
-    def from_json(cls, data: dict) -> Self:
-        if "error" in data:
-            raise LlamaException(data["error"])
-
-        if "timings" in data:
-            data["timings"] = LlamaTimings.from_json(data["timings"])
-
-        response = super().from_json(data)
-
-        # add missing `generation_settings` fields
-        if "generation_settings" in data:
-            response.generation_settings = LlamaGenerationSettings.from_json(data["generation_settings"])
-
-        return response
-
-
-type LlamaTokens = list[int] | list[dict[str, int | str]] | list[dict[str, int | list[int]]]
-
-
-class UnreasonableLlama:
-    def __init__(
-        self,
-        server_url: str = "",
-        request_timeout: int = 10000,
-    ):
-        if server_url == "":
-            if server_url_from_env := os.getenv("LLAMA_CPP_SERVER_URL"):
-                server_url = server_url_from_env
-            else:
-                raise LlamaException("Missing llama.cpp server URL!")
-
-        self.server_url = server_url
-        self.client = httpx.Client(
-            headers={"Content-Type": "application/json"},
-            timeout=request_timeout,
-            base_url=server_url,
-        )
-
-    def close(self) -> None:
-        self.client.close()
-
-    def is_alive(self) -> bool:
-        response = self.client.get("health").json()
-        return "status" in response and "error" not in response and response["status"] == "ok"
-
-    def slots(self) -> list[LlamaSlot]:
-        response = self.client.get("slots").json()
-        return [LlamaSlot.from_json(slot) for slot in response]
-
-    def props(self) -> LlamaProps:
-        response = self.client.get("props")
-        return LlamaProps.from_json(response.json())
-
-    def get_completion(self, request: LlamaCompletionRequest) -> LlamaCompletionResponse:
-        request_dict = request.to_dict()
-        request_dict["stream"] = False
-        request_json = json.dumps(request_dict)
-
-        response = self.client.post("completions", data=request_json)  # type: ignore
-        return LlamaCompletionResponse.from_json(response.json())
-
-    async def get_streamed_completion(self, request: LlamaCompletionRequest) -> AsyncIterator[LlamaCompletionResponse]:
-        request_dict = request.to_dict()
-        request_dict["stream"] = True
-        request_json = json.dumps(request_dict)
-
-        with self.client.stream("POST", "completions", data=request_json) as response:  # type: ignore
-            for chunk in response.iter_lines():
-                if chunk.startswith("data: "):
-                    chunk = chunk.removeprefix("data: ")
-                    yield LlamaCompletionResponse.from_json(json.loads(chunk))
-
-    def tokenize(self, request: LlamaTokenizeRequest) -> LlamaTokens:
-        request_json = request.to_json()
-        response = self.client.post("tokenize", data=request_json)  # type: ignore
-        return response.json()["tokens"]  # type: ignore
-
-    def detokenize(self, tokens: LlamaTokens) -> str:
-        request_json = json.dumps({"tokens": tokens})
-        response = self.client.post("detokenize", data=request_json)  # type: ignore
-        return response.json()["content"]  # type: ignore
+def complete(prompt: str, server_host: str | None = None, server_port: int | None = None):
+    pass
