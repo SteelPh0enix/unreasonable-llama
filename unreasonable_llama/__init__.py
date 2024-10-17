@@ -52,7 +52,7 @@ class LlamaGenerationSettings:
     n_ctx: int
     """Context length"""
     n_predict: int
-    """Amount of tokens to predict"""
+    """Maximum amount of tokens to predict"""
     model: str
     """Model name"""
     seed: int
@@ -251,6 +251,78 @@ class LlamaModel:
         )
 
 
+@dataclass
+class LlamaCompletionRequest:
+    """llama.cpp completion request.
+    Values left `None` will fallback to server defaults."""
+
+    prompt: str | list[int]
+    """prompt to complete, must be a string or a list of tokens"""
+    n_predict: int | None
+    """Maximum amount of tokens to predict."""
+    top_k: int | None
+    """Top-K sampling limits the number of tokens considered during prediction to specified value."""
+    top_p: float | None
+    """Top-P sampling limits the number of tokens considered during prediction based on their cumulative probability."""
+    min_p: float | None
+    """Min-P defines the minimum probability of token to be considered during prediction."""
+    xtc_probability: float | None
+    """This parameter tweaks the chance of XTC sampling happening."""
+    xtc_threshold: float | None
+    """XTC removes tokens with probability above specified threshold, except least probable one of them."""
+    tfs_z: float | None
+    """Tail-free sampling removes the tokens with less-than-desired second derivative of it's probability.
+    This parameter defines the probability in (0, 1] range, where 1 == TFS disabled."""
+    typical_p: float | None
+    """Locally typical sampling can increase diversity of the text without major coherence degradation by choosing tokens that are typical or expected based on the context.
+    This parameter defines probability in range (0, 1], where 1 == locally typical sampling disabled."""
+    temperature: float | None
+    """Temperature controls the probability distribution of tokens selected by LLM.
+    Temperature shouldn't be below 0."""
+    dynatemp_range: float | None
+    """Dynamic temperature range, if non-zero, defines the range of temperature used during token prediction.
+    Final temperature will be applied based on tokens entropy."""
+    dynatemp_exponent: float | None
+    """Dynamic temperature exponent, 1 by default"""
+    repeat_last_n: int | None
+    """Amount of last tokens to penalize for repetition. Setting this to 0 disabled penalization, and -1 penalizes the whole context."""
+    repeat_penalty: float | None
+    """Penalty for repeating the tokens in generated text."""
+    presence_penalty: float | None
+    """Penalty for re-using the tokens that are already present in generated text. 0 == presence penalty disabled."""
+    frequency_penalty: float | None
+    """Penalty applied for re-using the tokens that are already present in generated text, based on the frequency of their appearance. 0 == frequency penalty disabled."""
+    mirostat: int | None
+    """Mirostat type, 1 - Mirostat, 2 - Mirostat 2.0, 0 - disabled.
+    ENABLING MIROSTAT DISABLES OTHER SAMPLERS!"""
+    mirostat_tau: float | None
+    """Mirostat target entropy, desired perplexity for generated text."""
+    mirostat_eta: float | None
+    """Mirostat learning rate."""
+    penalize_nl: bool | None
+    """Penalize newline tokens?"""
+    n_keep: int | None
+    """Amount of tokens to keep from initial prompt when context is filled and it shifts."""
+    n_discard: int | None
+    """Number of tokens after n_keep that may be discarded when shifront context, 0 default to half."""
+    seed: int | None
+    """Seed used for RNG"""
+    min_keep: int | None
+    """If greater than 0, forces the sampler to return at least min_keep tokens."""
+    predition_time_limit_ms: int | None
+    """Time limit for prediction (text-generation) phase in milliseconds.
+    Starts counting when first token is generated.
+    If <= 0, timeout is disabled."""
+    ignore_eos: bool | None
+    """Ignore end-of-sentence token?"""
+    stop: list[str] | None
+    """List of strings stopping the generation."""
+    samplers: list[str] | None
+    """List of used samplers in order."""
+    grammar: str | None
+    """Custom, optional BNF-like grammar to constrain sampling."""
+
+
 class LlamaException(RuntimeError):
     """llama.cpp base exception, should be subclassed if more details
     useful to the user can be provided."""
@@ -314,5 +386,5 @@ def models(server_host: str | None = None, server_port: int | None = None) -> li
     return [LlamaModel.from_llama_cpp_response(model) for model in response["data"]]
 
 
-def complete(prompt: str, server_host: str | None = None, server_port: int | None = None):
+def complete(request: LlamaCompletionRequest, server_host: str | None = None, server_port: int | None = None):
     pass
