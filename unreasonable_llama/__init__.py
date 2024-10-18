@@ -37,12 +37,13 @@ supported, make PRs.
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
 import json
 import os
+from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from datetime import datetime
 from enum import IntEnum
+from typing import Any, cast
 
 import httpx
 
@@ -124,7 +125,7 @@ class LlamaGenerationSettings:
     """List of used samplers in order."""
 
     @staticmethod
-    def _from_llama_cpp_response(response: dict) -> LlamaGenerationSettings:
+    def _from_llama_cpp_response(response: dict[str, Any]) -> LlamaGenerationSettings:
         """hard-coded converstion from JSON to LlamaGenerationSettings"""
         return LlamaGenerationSettings(
             n_ctx=response["n_ctx"],
@@ -175,7 +176,7 @@ class LlamaProps:
     """Chat template for currently loaded model."""
 
     @staticmethod
-    def _from_llama_cpp_response(response: dict) -> LlamaProps:
+    def _from_llama_cpp_response(response: dict[str, Any]) -> LlamaProps:
         """hard-coded converstion from JSON to LlamaProps"""
         generation_settings = LlamaGenerationSettings._from_llama_cpp_response(response["default_generation_settings"])
         return LlamaProps(
@@ -220,7 +221,7 @@ class LlamaModelMeta:
     """Size"""
 
     @staticmethod
-    def _from_llama_cpp_response(response: dict) -> LlamaModelMeta:
+    def _from_llama_cpp_response(response: dict[str, Any]) -> LlamaModelMeta:
         """hard-coded converstion from JSON to LlamaModelMeta"""
         return LlamaModelMeta(
             vocab_type=LlamaVocabType(response["vocab_type"]),
@@ -244,7 +245,7 @@ class LlamaModel:
     """Metadata"""
 
     @staticmethod
-    def _from_llama_cpp_response(response: dict) -> LlamaModel:
+    def _from_llama_cpp_response(response: dict[str, Any]) -> LlamaModel:
         """hard-coded converstion from JSON to LlamaModel"""
         return LlamaModel(
             id=response["id"],
@@ -324,7 +325,7 @@ class LlamaCompletionRequest:
     grammar: str | None = None
     """Custom, optional BNF-like grammar to constrain sampling."""
 
-    def _to_llama_cpp_request_json(self) -> dict:
+    def _to_llama_cpp_request_json(self) -> dict[str, Any]:
         request_dict = {
             "prompt": self.prompt,
             "n_predict": self.n_predict,
@@ -381,7 +382,7 @@ class LlamaTimings:
     """Time taken to process each token in the prompt in milliseconds"""
 
     @staticmethod
-    def _from_llama_cpp_response(response: dict) -> LlamaTimings:
+    def _from_llama_cpp_response(response: dict[str, Any]) -> LlamaTimings:
         """hard-coded converstion from JSON to LlamaTimings"""
         return LlamaTimings(
             predicted_ms=response["predicted_ms"],
@@ -434,7 +435,7 @@ class LlamaCompletionResponse:
     """Whether the completion was truncated"""
 
     @staticmethod
-    def _from_llama_cpp_response(response: dict) -> LlamaCompletionResponse:
+    def _from_llama_cpp_response(response: dict[str, Any]) -> LlamaCompletionResponse:
         """hard-coded converstion from JSON to LlamaCompletionResponse"""
         generation_settings = None
         if response_gen_settings := response.get("generation_settings", None):
@@ -515,7 +516,7 @@ def health(
     """Returns `True` if server is alive and ready, `False` if it's not ready"""
     server_url = _make_llama_server_url(server_host, server_port)
     response = httpx.get(f"{server_url}/health", timeout=timeout).json()
-    return response.get("status", "") == "ok"
+    return bool(response.get("status", "") == "ok")
 
 
 def props(
@@ -606,11 +607,13 @@ def tokenize(
 ) -> list[int]:
     """Returns a list of tokens corresponding to tokenized message"""
     server_url = _make_llama_server_url(server_host, server_port)
-    request = json.dumps({
-        "content": message,
-        "add_special": add_special_tokens,
-        "with_pieces": False,
-    })
+    request = json.dumps(
+        {
+            "content": message,
+            "add_special": add_special_tokens,
+            "with_pieces": False,
+        }
+    )
 
     response = httpx.post(
         f"{server_url}/tokenize",
@@ -619,7 +622,7 @@ def tokenize(
         timeout=timeout,
     ).json()
 
-    return response["tokens"]
+    return cast(list[int], response["tokens"])
 
 
 def detokenize(
@@ -630,9 +633,11 @@ def detokenize(
 ) -> str:
     """Returns detokenized message"""
     server_url = _make_llama_server_url(server_host, server_port)
-    request = json.dumps({
-        "tokens": tokens,
-    })
+    request = json.dumps(
+        {
+            "tokens": tokens,
+        }
+    )
 
     response = httpx.post(
         f"{server_url}/detokenize",
@@ -641,4 +646,4 @@ def detokenize(
         timeout=timeout,
     ).json()
 
-    return response["content"]
+    return cast(str, response["content"])
