@@ -19,9 +19,9 @@ Currently supported endpoints (methods) [functions that support them]:
     * `/health` (GET) [health()]
     * `/props` (GET) [props()]
     * `/models` (GET) [models()]
-    * `/completions` (POST) [complete(prompt), streamed_complete(prompt)]
-    * `/tokenize` (POST) [tokenize(raw_prompt)]
-    * `/detokenize` (POST) [detokenize(tokenized_prompt)]
+    * `/completions` (POST) [complete(request), streamed_complete(request)]
+    * `/tokenize` (POST) [tokenize(message)]
+    * `/detokenize` (POST) [detokenize(tokens)]
     * `/slots` (GET) [slots()]
 
 Note: `complete` and `streamed_complete` accept both tokenized and raw prompt.
@@ -32,11 +32,12 @@ This librarty uses `httpx`. In case of connection issues, expect
 Authenthication and error handling is not implemented yet.
 
 I develop this library mostly for myself - if you want to see more endpoints
-supported, make PRs. Don't forget about pre-commit checks.
+supported, make PRs.
 """
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
 import json
 import os
 from dataclasses import dataclass
@@ -400,61 +401,67 @@ class LlamaCompletionResponse:
 
     content: str
     """Generated text"""
-    generation_settings: LlamaGenerationSettings
+    generation_settings: LlamaGenerationSettings | None
     """Generation settings used for the completion"""
-    has_new_line: bool
+    has_new_line: bool | None
     """Whether the response has a new line at the end"""
     id_slot: int
     """ID of the slot used for the completion"""
     index: int
-    model: str
+    model: str | None
     """Model used for the completion"""
-    prompt: str
+    prompt: str | None
     """Prompt used for the completion"""
     stop: bool
     """Whether the completion was stopped"""
-    stopped_eos: bool
+    stopped_eos: bool | None
     """Whether the completion was stopped due to reaching the end of sentence"""
-    stopped_limit: bool
+    stopped_limit: bool | None
     """Whether the completion was stopped due to reaching the token limit"""
-    stopped_word: bool
+    stopped_word: bool | None
     """Whether the completion was stopped due to reaching a stopping word"""
-    stopping_word: str
+    stopping_word: str | None
     """Stopping word that caused the completion to stop"""
-    timings: LlamaTimings
+    timings: LlamaTimings | None
     """Completion timings"""
-    tokens_cached: int
+    tokens_cached: int | None
     """Number of tokens cached"""
-    tokens_evaluated: int
+    tokens_evaluated: int | None
     """Number of tokens evaluated"""
-    tokens_predicted: int
+    tokens_predicted: int | None
     """Number of tokens predicted"""
-    truncated: bool
+    truncated: bool | None
     """Whether the completion was truncated"""
 
     @staticmethod
     def _from_llama_cpp_response(response: dict) -> LlamaCompletionResponse:
         """hard-coded converstion from JSON to LlamaCompletionResponse"""
-        generation_settings = LlamaGenerationSettings._from_llama_cpp_response(response["generation_settings"])
-        timings = LlamaTimings._from_llama_cpp_response(response["timings"])
+        generation_settings = None
+        if response_gen_settings := response.get("generation_settings", None):
+            generation_settings = LlamaGenerationSettings._from_llama_cpp_response(response_gen_settings)
+
+        timings = None
+        if response_timings := response.get("timings", None):
+            timings = LlamaTimings._from_llama_cpp_response(response_timings)
+
         return LlamaCompletionResponse(
             content=response["content"],
             generation_settings=generation_settings,
-            has_new_line=response["has_new_line"],
+            has_new_line=response.get("has_new_line", None),
             id_slot=response["id_slot"],
             index=response["index"],
-            model=response["model"],
-            prompt=response["prompt"],
+            model=response.get("model", None),
+            prompt=response.get("prompt", None),
             stop=response["stop"],
-            stopped_eos=response["stopped_eos"],
-            stopped_limit=response["stopped_limit"],
-            stopped_word=response["stopped_word"],
-            stopping_word=response["stopping_word"],
+            stopped_eos=response.get("stopped_eos", None),
+            stopped_limit=response.get("stopped_limit", None),
+            stopped_word=response.get("stopped_word", None),
+            stopping_word=response.get("stopping_word", None),
             timings=timings,
-            tokens_cached=response["tokens_cached"],
-            tokens_evaluated=response["tokens_evaluated"],
-            tokens_predicted=response["tokens_predicted"],
-            truncated=response["truncated"],
+            tokens_cached=response.get("tokens_cached", None),
+            tokens_evaluated=response.get("tokens_evaluated", None),
+            tokens_predicted=response.get("tokens_predicted", None),
+            truncated=response.get("truncated", None),
         )
 
 
@@ -557,3 +564,81 @@ def complete(
         timeout=timeout,
     ).json()
     return LlamaCompletionResponse._from_llama_cpp_response(response)
+
+
+async def streamed_complete(
+    request: LlamaCompletionRequest,
+    server_host: str | None = None,
+    server_port: int | None = None,
+    timeout: float = 60.0,
+) -> AsyncIterator[LlamaCompletionResponse]:
+    """Request completion from llama.cpp server.
+    Yields the response in chunks.
+    If you'd prefer to fetch chunks of the response, use `streamed_complete` function."""
+    server_url = _make_llama_server_url(server_host, server_port)
+    request_dict = request._to_llama_cpp_request_json()
+    # streaming function
+    request_dict["stream"] = True
+    # we don't support n_probs in requests yet
+    request_dict["n_probs"] = 0
+    request_json = json.dumps(request_dict)
+
+    with httpx.stream(
+        "POST",
+        f"{server_url}/completions",
+        content=request_json,
+        headers={"Content-Type": "application/json"},
+        timeout=timeout,
+    ) as response:
+        for chunk in response.iter_lines():
+            if len(chunk) > 0:
+                chunk_data = chunk.removeprefix("data: ")
+                response_json = json.loads(chunk_data)
+                yield LlamaCompletionResponse._from_llama_cpp_response(response_json)
+
+
+def tokenize(
+    message: str,
+    add_special_tokens: bool = False,
+    server_host: str | None = None,
+    server_port: int | None = None,
+    timeout: float = 60.0,
+) -> list[int]:
+    """Returns a list of tokens corresponding to tokenized message"""
+    server_url = _make_llama_server_url(server_host, server_port)
+    request = json.dumps({
+        "content": message,
+        "add_special": add_special_tokens,
+        "with_pieces": False,
+    })
+
+    response = httpx.post(
+        f"{server_url}/tokenize",
+        content=request,
+        headers={"Content-Type": "application/json"},
+        timeout=timeout,
+    ).json()
+
+    return response["tokens"]
+
+
+def detokenize(
+    tokens: list[int],
+    server_host: str | None = None,
+    server_port: int | None = None,
+    timeout: float = 60.0,
+) -> str:
+    """Returns detokenized message"""
+    server_url = _make_llama_server_url(server_host, server_port)
+    request = json.dumps({
+        "tokens": tokens,
+    })
+
+    response = httpx.post(
+        f"{server_url}/detokenize",
+        content=request,
+        headers={"Content-Type": "application/json"},
+        timeout=timeout,
+    ).json()
+
+    return response["content"]
