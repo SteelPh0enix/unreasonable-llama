@@ -14,3 +14,13 @@ pprint(props)
 
 models = llama.models()
 pprint(models)
+
+example_small_completion = llama.LlamaCompletionRequest(
+    prompt="Here's a random fact:",
+    n_predict=100,
+)
+
+print("Requesting completion for")
+pprint(example_small_completion)
+completion = llama.complete(example_small_completion)
+pprint(completion)
