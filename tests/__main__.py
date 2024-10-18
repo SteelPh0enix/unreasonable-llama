@@ -1,78 +1,48 @@
+import argparse
 import asyncio
-import sys
-from typing import cast
 from pprint import pprint
 
-import httpx
+import unreasonable_llama as llama
 
-from unreasonable_llama import (
-    LlamaCompletionRequest,
-    LlamaTokenizeRequest,
-    UnreasonableLlama,
-)
+parser = argparse.ArgumentParser()
+parser.add_argument("--test-completion", action="store_true", help="Run completion tests")
+args = parser.parse_args()
 
-print("==================== INIT ====================")
+server_is_alive = llama.health()
+if server_is_alive:
+    print("Server is alive!")
+else:
+    print("Server is NOT alive!")
+    exit(1)
 
-# This will load the URL from `LLAMA_CPP_SERVER_URL` environmental variable,
-# or throw an error if it doesn't exist.
-llama = UnreasonableLlama()
-# Alternatively, you can do this:
-# llama = UnreasonableLlama("http://localhost:8080/")
+props = llama.props()
+pprint(props)
 
-try:
-    # you can use `is_alive()` to check server connection
-    if llama.is_alive():
-        print("llama server is alive!")
-        print("slots:")
-        for slot in llama.slots():
-            pprint(slot)
+models = llama.models()
+pprint(models)
 
-        props = llama.props()
-        print(f"Loaded model: {props.default_generation_settings.model}")
-        print("\nprops:")
-        pprint(props)
-    else:
-        print("llama server is not alive, quitting!")
-        sys.exit(1)
-except httpx.ConnectError:
-    print(
-        f"Unable to connect to llama.cpp server @ {llama.server_url}, verify if it's running under correct host/port?"
+if args.test_completion:
+    example_small_completion = llama.LlamaCompletionRequest(
+        prompt="Here's a random fact:",
+        n_predict=100,
     )
-    sys.exit(1)
 
-print("==================== COMPLETION ====================")
+    print("Requesting blocking completion for")
+    pprint(example_small_completion)
+    sync_completion = llama.complete(example_small_completion)
+    pprint(sync_completion)
 
-# You can request completion in synchronous or asynchronous way.
-# It's up to you to format the prompt for the loaded model, this library
-# is as simple as it can possibly be and doesn't provide any high-level
-# functions. Therefore, the following test may result in model spewing
-# nonsense, but as long as it responds, you can assume it's working correctly.
-request = LlamaCompletionRequest(prompt="Briefly describe highest mountain on Mars.\n", n_predict=100)
-response = llama.get_completion(request)
-print(f"Synchronous response: {response.content}\n")
+    async def perform_async_completion(request: llama.LlamaCompletionRequest):
+        async for chunk in llama.streamed_complete(request):
+            pprint(chunk)
 
+    print("Requesting asynchronous completion for")
+    pprint(example_small_completion)
+    asyncio.run(perform_async_completion(example_small_completion))
 
-async def get_async_completion(llama: UnreasonableLlama, request: LlamaCompletionRequest):
-    print("Asynchronous response: ", end="", flush=True)
-    async for chunk in llama.get_streamed_completion(request):
-        # chunk is LlamaCompletionResponse
-        print(chunk.content, end="", flush=True)
-
-    print("\n")
-
-
-request = LlamaCompletionRequest(prompt="Briefly describe highest mountain on Earth.\n", n_predict=100)
-asyncio.run(get_async_completion(llama, request))
-
-# test tokenization and detokenization
-print("==================== (DE)TOKENIZATION ====================")
-
-text_to_tokenize = "Hello world, pls tokenize me!"
-tokenize_request = LlamaTokenizeRequest(text_to_tokenize)
-tokenized_text = cast(list[int], llama.tokenize(tokenize_request))
-print(f"Tokenized text: {tokenized_text}")
-detokenized_text = llama.detokenize(tokenized_text)
-print(f"Detokenized text: {detokenized_text}")
-
-# closing is recommended
-llama.close()
+text_to_tokenize = "Hi, this is a sample sentence that's gonna be tokenized!"
+print(f"Tokenizing '{text_to_tokenize}'")
+tokens = llama.tokenize(text_to_tokenize)
+print(f"Tokens: {tokens}")
+detokenized_text = llama.detokenize(tokens)
+print(f"Detokenized text: '{detokenized_text}'")
