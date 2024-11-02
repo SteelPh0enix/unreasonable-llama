@@ -79,9 +79,10 @@ class LlamaGenerationSettings:
     """This parameter tweaks the chance of XTC sampling happening."""
     xtc_threshold: float
     """XTC removes tokens with probability above specified threshold, except least probable one of them."""
-    tfs_z: float
-    """Tail-free sampling removes the tokens with less-than-desired second derivative of it's probability.
-    This parameter defines the probability in (0, 1] range, where 1 == TFS disabled."""
+    # NOTE: This was removed in recent llama.cpp release, i'm keeping it here commented for legacy purposes.
+    # tfs_z: float
+    # """Tail-free sampling removes the tokens with less-than-desired second derivative of it's probability.
+    # This parameter defines the probability in (0, 1] range, where 1 == TFS disabled."""
     typical_p: float
     """Locally typical sampling can increase diversity of the text without major coherence degradation by choosing tokens that are typical or expected based on the context.
     This parameter defines probability in range (0, 1], where 1 == locally typical sampling disabled."""
@@ -93,6 +94,17 @@ class LlamaGenerationSettings:
     """Penalty for re-using the tokens that are already present in generated text. 0 == presence penalty disabled."""
     frequency_penalty: float
     """Penalty applied for re-using the tokens that are already present in generated text, based on the frequency of their appearance. 0 == frequency penalty disabled."""
+    dry_multiplier: float
+    """DRY sampling repetition penalty multiplier. Penalty is calculated with following formula: multiplier * base ^ (length of sequence before token - allowed length).
+    DRY sampling is described here: https://github.com/oobabooga/text-generation-webui/pull/5677"""
+    dry_base: float
+    """DRY sampling base penalty. See dry_multiplier docs for details."""
+    dry_allowed_length: int
+    """Tokens extending repetitions beyond this receive penalty. See dry_multiplier docs for details."""
+    dry_penalty_last_n: int
+    """How many tokens should be scanned for repetition (0 = penalization disabled, -1 = whole context)"""
+    dry_sequence_breakers: list[str]
+    """DRY sampler's sequence breakers."""
     mirostat: int
     """Mirostat type, 1 - Mirostat, 2 - Mirostat 2.0, 0 - disabled.
     ENABLING MIROSTAT DISABLES OTHER SAMPLERS!"""
@@ -126,7 +138,7 @@ class LlamaGenerationSettings:
 
     @staticmethod
     def _from_llama_cpp_response(response: dict[str, Any]) -> LlamaGenerationSettings:
-        """hard-coded converstion from JSON to LlamaGenerationSettings"""
+        """hard-coded conversion from JSON to LlamaGenerationSettings"""
         return LlamaGenerationSettings(
             n_ctx=response["n_ctx"],
             n_predict=response["n_predict"],
@@ -141,12 +153,17 @@ class LlamaGenerationSettings:
             min_p=response["min_p"],
             xtc_probability=response["xtc_probability"],
             xtc_threshold=response["xtc_threshold"],
-            tfs_z=response["tfs_z"],
+            # tfs_z=response["tfs_z"],
             typical_p=response["typical_p"],
             repeat_last_n=response["repeat_last_n"],
             repeat_penalty=response["repeat_penalty"],
             presence_penalty=response["presence_penalty"],
             frequency_penalty=response["frequency_penalty"],
+            dry_multiplier=response["dry_multiplier"],
+            dry_base=response["dry_base"],
+            dry_allowed_length=response["dry_allowed_length"],
+            dry_penalty_last_n=response["dry_penalty_last_n"],
+            dry_sequence_breakers=response["dry_sequence_breakers"],
             mirostat=response["mirostat"],
             mirostat_tau=response["mirostat_tau"],
             mirostat_eta=response["mirostat_eta"],
