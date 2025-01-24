@@ -5,6 +5,6 @@ echo "Checked files: $python_files"
 
 set -xeo pipefail
 
-poetry run ruff format $python_files
-poetry run mypy $python_files
-poetry run ruff check --fix $python_files
+uv run ruff format $python_files
+uv run mypy $python_files
+uv run ruff check --fix $python_files

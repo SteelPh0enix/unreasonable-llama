@@ -26,10 +26,10 @@ Currently supported endpoints (methods) [functions that support them]:
 
 Note: `complete` and `streamed_complete` accept both tokenized and raw prompt.
 
-This librarty uses `httpx`. In case of connection issues, expect
+This library uses `httpx`. In case of connection issues, expect
 `httpx.ConnectError` to happen.
 
-Authenthication and error handling is not implemented yet.
+Authentication and error handling is not implemented yet.
 
 I develop this library mostly for myself - if you want to see more endpoints
 supported, make PRs.
@@ -39,13 +39,16 @@ from __future__ import annotations
 
 import json
 import os
-from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from datetime import datetime
 from enum import IntEnum
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
-import httpx
+# why tf mypy doesn't see the `py.typed` there?
+import httpx  # type: ignore
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncIterator
 
 
 @dataclass(frozen=True)
@@ -624,13 +627,11 @@ def tokenize(
 ) -> list[int]:
     """Returns a list of tokens corresponding to tokenized message"""
     server_url = _make_llama_server_url(server_host, server_port)
-    request = json.dumps(
-        {
-            "content": message,
-            "add_special": add_special_tokens,
-            "with_pieces": False,
-        }
-    )
+    request = json.dumps({
+        "content": message,
+        "add_special": add_special_tokens,
+        "with_pieces": False,
+    })
 
     response = httpx.post(
         f"{server_url}/tokenize",
@@ -650,11 +651,9 @@ def detokenize(
 ) -> str:
     """Returns detokenized message"""
     server_url = _make_llama_server_url(server_host, server_port)
-    request = json.dumps(
-        {
-            "tokens": tokens,
-        }
-    )
+    request = json.dumps({
+        "tokens": tokens,
+    })
 
     response = httpx.post(
         f"{server_url}/detokenize",
