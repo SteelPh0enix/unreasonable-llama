@@ -8,6 +8,7 @@ license = "MIT"
 repository = "https://github.com/SteelPh0enix/unreasonable-llama/"
 requires-python = ">= 3.10"
 dependencies = [
+    "dataclasses-json>=0.6.7",
     "httpx>=0.28.1",
 ]
 
