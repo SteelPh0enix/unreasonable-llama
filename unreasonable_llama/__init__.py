@@ -16,13 +16,13 @@ I'm trying to keep it up-to-date with llama.cpp master, but on major changes
 it usually takes me a while to notice and fix stuff - PRs are welcome!
 
 Currently supported endpoints (methods) [functions that support them]:
-    * `/health` (GET) [health()]
+    * `/health` (GET) [is_alive()]
     * `/props` (GET) [props()]
     * `/models` (GET) [models()]
-    * `/completions` (POST) [complete(request), streamed_complete(request)]
+    * `/completions` (POST) [complete(request), stream_completion(request)]
     * `/tokenize` (POST) [tokenize(message)]
     * `/detokenize` (POST) [detokenize(tokens)]
-    * `/slots` (GET) [slots()]
+    * `/apply-template` (POST) [apply_template(messages)]
 
 Note: `complete` and `streamed_complete` accept both tokenized and raw prompt.
 
@@ -127,11 +127,13 @@ class NextToken:
     n_decoded: int
     stopping_word: str
 
+
 @dataclass_json(undefined=Undefined.RAISE)
 @dataclass
 class ModelModalities:
     vision: bool
     audio: bool
+
 
 @dataclass_json(undefined=Undefined.RAISE)
 @dataclass
@@ -202,7 +204,7 @@ def _make_llama_server_url(host: str | None, port: int | None) -> str:
     return f"http://{host}:{port}"
 
 
-def health(
+def is_alive(
     server_host: str | None = None,
     server_port: int | None = None,
     timeout: float = 60.0,

@@ -10,8 +10,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--test-completion", action="store_true", help="Run completion tests")
 args = parser.parse_args()
 
-server_is_alive = llama.health()
-if server_is_alive:
+if llama.is_alive():
     print("Server is alive!")
 else:
     print("Server is NOT alive!")
