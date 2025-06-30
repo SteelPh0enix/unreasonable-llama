@@ -6,22 +6,22 @@ jobs:
   check-code:
     name: Check Python code
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
 
     steps:
-      - name: 'Checkout code'
+      - name: "Checkout code"
         uses: actions/checkout@v4
-      - name: 'Setup Python'
-        uses: actions/setup-python@v5
+      - name: Install the latest version of uv
+        uses: astral-sh/setup-uv@v6
         with:
-          python-version: '3.12'
-      - name: 'Install Poetry'
-        run: pipx install poetry --python $(which python)
-      - name: 'Install project dependencies'
-        run: poetry install
-      - name: 'Check code formatting'
-        run: poetry run ruff format --diff $(ls ./unreasonable_llama/*.py)
-      - name: 'Check code with ruff'
-        run: poetry run ruff check --no-fix --no-unsafe-fixes --statistics $(ls ./unreasonable_llama/*.py)
-      - name: 'Check code with mypy'
-        run: poetry run mypy $(ls ./unreasonable_llama/*.py)
-
+          python-version: ${{ matrix.python-version }}
+      - name: "Install project dependencies"
+        run: uv sync
+      - name: "Check code formatting"
+        run: uv run ruff format --diff ./unreasonable_llama/__init__.py
+      - name: "Check code with ruff"
+        run: uv run ruff check --no-fix ./unreasonable_llama/__init__.py
+      - name: "Check code with mypy"
+        run: uv run mypy ./unreasonable_llama/__init__.py
