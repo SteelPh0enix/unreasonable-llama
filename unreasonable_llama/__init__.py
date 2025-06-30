@@ -36,7 +36,7 @@ import os
 from dataclasses import dataclass, field
 
 import httpx
-from dataclasses_json import Undefined, config, dataclass_json
+from dataclasses_json import Undefined, config, dataclass_json  # pyright: ignore[reportUnknownVariableType]
 
 
 @dataclass_json(undefined=Undefined.RAISE)
@@ -89,9 +89,9 @@ class GenerationParams:
     min_keep: int
     grammar: str
     samplers: list[str]
-    speculative_n_max: int = field(metadata=config(field_name="speculative.n_max"))
-    speculative_n_min: int = field(metadata=config(field_name="speculative.n_min"))
-    speculative_p_min: float = field(metadata=config(field_name="speculative.p_min"))
+    speculative_n_max: int = field(metadata=config(field_name="speculative.n_max"))  # pyright: ignore[reportUnknownArgumentType]
+    speculative_n_min: int = field(metadata=config(field_name="speculative.n_min"))  # pyright: ignore[reportUnknownArgumentType]
+    speculative_p_min: float = field(metadata=config(field_name="speculative.p_min"))  # pyright: ignore[reportUnknownArgumentType]
     timings_per_token: bool
     post_sampling_probs: bool
     lora: list[str]
