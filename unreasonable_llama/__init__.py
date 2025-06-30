@@ -18,7 +18,6 @@ it usually takes me a while to notice and fix stuff - PRs are welcome!
 Currently supported endpoints (methods) [functions that support them]:
     * `/health` (GET) [is_alive()]
     * `/props` (GET) [props()]
-    * `/models` (GET) [models()]
     * `/completions` (POST) [complete(request), stream_completion(request)]
     * `/tokenize` (POST) [tokenize(message)]
     * `/detokenize` (POST) [detokenize(tokens)]
@@ -38,71 +37,73 @@ from dataclasses import dataclass, field
 import httpx
 from dataclasses_json import Undefined, config, dataclass_json  # pyright: ignore[reportUnknownVariableType]
 
+DEFAULT_REQUEST_TIMEOUT: float = 60.0
+
 
 @dataclass_json(undefined=Undefined.RAISE)
 @dataclass
 class ModelInfo:
-    id: str
     created: int
-    vocab_type: str
-    n_vocab: int
+    id: str
     n_ctx_train: int
     n_embd: int
     n_params: int
+    n_vocab: int
     size: int
+    vocab_type: str
 
 
 @dataclass_json(undefined=Undefined.RAISE)
 @dataclass
 class GenerationParams:
-    n_predict: int
-    seed: int
-    temperature: float
-    dynatemp_range: float
-    dynatemp_exponent: float
-    top_k: int
-    top_p: float
-    min_p: float
-    top_n_sigma: float
-    xtc_probability: float
-    xtc_threshold: float
-    typical_p: float
-    repeat_last_n: int
-    repeat_penalty: float
-    presence_penalty: float
-    frequency_penalty: float
-    dry_multiplier: float
-    dry_base: float
+    chat_format: str
     dry_allowed_length: int
+    dry_base: float
+    dry_multiplier: float
     dry_penalty_last_n: int
     dry_sequence_breakers: list[str]
-    mirostat: int
-    mirostat_tau: float
-    mirostat_eta: float
-    stop: list[str]
-    max_tokens: int
-    n_keep: int
-    n_discard: int
-    ignore_eos: bool
-    stream: bool
-    logit_bias: list[int]
-    n_probs: int
-    min_keep: int
+    dynatemp_exponent: float
+    dynatemp_range: float
+    frequency_penalty: float
     grammar: str
     grammar_lazy: bool
     grammar_triggers: list[str]
+    ignore_eos: bool
+    logit_bias: list[int]
+    lora: list[str]
+    max_tokens: int
+    min_keep: int
+    min_p: float
+    mirostat: int
+    mirostat_eta: float
+    mirostat_tau: float
+    n_discard: int
+    n_keep: int
+    n_predict: int
+    n_probs: int
+    post_sampling_probs: bool
+    presence_penalty: float
     preserved_tokens: list[int]
-    chat_format: str
     reasoning_format: str
     reasoning_in_content: bool
-    thinking_forced_open: bool
+    repeat_last_n: int
+    repeat_penalty: float
     samplers: list[str]
+    seed: int
     speculative_n_max: int = field(metadata=config(field_name="speculative.n_max"))  # pyright: ignore[reportUnknownArgumentType]
     speculative_n_min: int = field(metadata=config(field_name="speculative.n_min"))  # pyright: ignore[reportUnknownArgumentType]
     speculative_p_min: float = field(metadata=config(field_name="speculative.p_min"))  # pyright: ignore[reportUnknownArgumentType]
+    stop: list[str]
+    stream: bool
+    temperature: float
+    thinking_forced_open: bool
     timings_per_token: bool
-    post_sampling_probs: bool
-    lora: list[str]
+    top_k: int
+    top_n_sigma: float
+    top_p: float
+    typical_p: float
+    xtc_probability: float
+    xtc_threshold: float
 
 
 @dataclass_json(undefined=Undefined.RAISE)
@@ -110,56 +111,49 @@ class GenerationParams:
 class GenerationSettings:
     id: int
     id_task: int
-    n_ctx: int
-    speculative: bool
     is_processing: bool
+    n_ctx: int
+    next_token: NextToken
     params: GenerationParams
     prompt: str
-    next_token: NextToken
+    speculative: bool
 
 
 @dataclass_json(undefined=Undefined.RAISE)
 @dataclass
 class NextToken:
-    has_next_token: bool
     has_new_line: bool
-    n_remain: int
+    has_next_token: bool
     n_decoded: int
+    n_remain: int
     stopping_word: str
 
 
 @dataclass_json(undefined=Undefined.RAISE)
 @dataclass
 class ModelModalities:
-    vision: bool
     audio: bool
+    vision: bool
 
 
 @dataclass_json(undefined=Undefined.RAISE)
 @dataclass
 class ModelProps:
-    default_generation_settings: GenerationSettings
-    total_slots: int
-    model_path: str
-    chat_template: str
-    modalities: ModelModalities
     bos_token: str
-    eos_token: str
     build_info: str
+    chat_template: str
+    default_generation_settings: GenerationSettings
+    eos_token: str
+    modalities: ModelModalities
+    model_path: str
+    total_slots: int
 
 
 @dataclass_json(undefined=Undefined.RAISE)
 @dataclass
-class Slot:
-    id: int
-    id_task: int
-    n_ctx: int
-    speculative: bool
-    is_processing: bool
-    non_casual: bool
-    params: GenerationParams
-    prompt: str
-    next_token: NextToken
+class ChatMessage:
+    role: str
+    content: str
 
 
 class LlamaError(RuntimeError):
@@ -207,7 +201,7 @@ def _make_llama_server_url(host: str | None, port: int | None) -> str:
 def is_alive(
     server_host: str | None = None,
     server_port: int | None = None,
-    timeout: float = 60.0,
+    timeout: float = DEFAULT_REQUEST_TIMEOUT,
 ) -> bool:
     """Returns `True` if server is alive and ready, `False` if it's not ready (model is still loading)"""
     server_url = _make_llama_server_url(server_host, server_port)
@@ -218,9 +212,23 @@ def is_alive(
 def props(
     server_host: str | None = None,
     server_port: int | None = None,
-    timeout: float = 60.0,
+    timeout: float = DEFAULT_REQUEST_TIMEOUT,
 ) -> ModelProps:
     """Returns `True` if server is alive and ready, `False` if it's not ready"""
     server_url = _make_llama_server_url(server_host, server_port)
     response = httpx.get(f"{server_url}/props", timeout=timeout).read()
     return ModelProps.from_json(response)  # type: ignore
+
+
+def apply_template(
+    messages: list[ChatMessage],
+    server_host: str | None = None,
+    server_port: int | None = None,
+    timeout: float = DEFAULT_REQUEST_TIMEOUT,
+) -> str:
+    """Applies chat template to provided list of messages, and returns a single message that's
+    ready to be passed to /completion endpoint."""
+    server_url = _make_llama_server_url(server_host, server_port)
+    messages_list = [message.to_dict() for message in messages]  # type: ignore
+    response = httpx.post(f"{server_url}/apply-template", timeout=timeout, json={"messages": messages_list}).json()  # pyright: ignore[reportUnknownArgumentType]
+    return response.get("prompt")  # type: ignore

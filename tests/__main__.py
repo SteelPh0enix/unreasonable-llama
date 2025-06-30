@@ -19,6 +19,16 @@ else:
 props = llama.props()
 pprint(props)
 
+example_conversation = [
+    llama.ChatMessage(role="system", content="You are a helpful assistant."),
+    llama.ChatMessage(role="user", content="What's 2+2?"),
+    llama.ChatMessage(role="assistant", content="It's 4."),
+    llama.ChatMessage(role="user", content="Thanks, now tell me what's 12*34."),
+]
+
+templated_conversation = llama.apply_template(example_conversation)
+pprint(templated_conversation)
+
 # models = llama.models()
 # pprint(models)
 #
