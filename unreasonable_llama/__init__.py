@@ -5,15 +5,12 @@ llama.cpp typed python bindings
 * fully typed
 * uses the same env variables as llama.cpp server (listed below)
 
-If server's host/port is not specified, following environmental variables are
-used instead:
+If server's host/port is not specified, following environmental variables are used instead:
     * `LLAMA_ARG_HOST`
     * `LLAMA_ARG_PORT`
 
-This library is still WIP and v0.x, major rewrites should be expected between
-minor releases.
-I'm trying to keep it up-to-date with llama.cpp master, but on major changes
-it usually takes me a while to notice and fix stuff - PRs are welcome!
+This library is still WIP and v0.x, major rewrites should be expected between minor releases.
+I'm trying to keep it up-to-date with llama.cpp master, but on major changes it usually takes me a while to notice and fix stuff - PRs are welcome!
 
 Currently supported endpoints (methods) [functions that support them]:
     * `/health` (GET) [is_alive()]
@@ -25,8 +22,7 @@ Currently supported endpoints (methods) [functions that support them]:
 
 Note: `complete` and `streamed_complete` accept both tokenized and raw prompt.
 
-This library uses `httpx`. In case of connection issues, expect
-`httpx.ConnectError` to happen.
+This library uses `httpx`. In case of connection issues, expect `httpx.ConnectError` to happen.
 """
 
 from __future__ import annotations
