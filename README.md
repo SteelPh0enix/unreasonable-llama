@@ -2,7 +2,7 @@
 
 [![Check code formatting and validity](https://github.com/SteelPh0enix/unreasonable-llama/actions/workflows/check-code.yml/badge.svg?branch=master)](https://github.com/SteelPh0enix/unreasonable-llama/actions/workflows/check-code.yml)
 
-(Yet another) Python API for [llama.cpp server](https://github.com/ggerganov/llama.cpp/tree/master/examples/server)
+(Yet another) Python API for [llama.cpp server](https://github.com/ggerganov/llama.cpp/tree/master/tools/server)
 
 For now, i'm targeting minimal support necessary for `/completion` and `/health` endpoint.
 Maybe i'll extend this lib in the future.
