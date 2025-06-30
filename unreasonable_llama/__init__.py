@@ -63,6 +63,7 @@ class GenerationParams:
     top_k: int
     top_p: float
     min_p: float
+    top_n_sigma: float
     xtc_probability: float
     xtc_threshold: float
     typical_p: float
@@ -88,6 +89,13 @@ class GenerationParams:
     n_probs: int
     min_keep: int
     grammar: str
+    grammar_lazy: bool
+    grammar_triggers: list[str]
+    preserved_tokens: list[int]
+    chat_format: str
+    reasoning_format: str
+    reasoning_in_content: bool
+    thinking_forced_open: bool
     samplers: list[str]
     speculative_n_max: int = field(metadata=config(field_name="speculative.n_max"))  # pyright: ignore[reportUnknownArgumentType]
     speculative_n_min: int = field(metadata=config(field_name="speculative.n_min"))  # pyright: ignore[reportUnknownArgumentType]
@@ -105,7 +113,6 @@ class GenerationSettings:
     n_ctx: int
     speculative: bool
     is_processing: bool
-    non_causal: bool
     params: GenerationParams
     prompt: str
     next_token: NextToken
@@ -120,6 +127,11 @@ class NextToken:
     n_decoded: int
     stopping_word: str
 
+@dataclass_json(undefined=Undefined.RAISE)
+@dataclass
+class ModelModalities:
+    vision: bool
+    audio: bool
 
 @dataclass_json(undefined=Undefined.RAISE)
 @dataclass
@@ -128,6 +140,9 @@ class ModelProps:
     total_slots: int
     model_path: str
     chat_template: str
+    modalities: ModelModalities
+    bos_token: str
+    eos_token: str
     build_info: str
 
 
@@ -192,7 +207,7 @@ def health(
     server_port: int | None = None,
     timeout: float = 60.0,
 ) -> bool:
-    """Returns `True` if server is alive and ready, `False` if it's not ready"""
+    """Returns `True` if server is alive and ready, `False` if it's not ready (model is still loading)"""
     server_url = _make_llama_server_url(server_host, server_port)
     response = httpx.get(f"{server_url}/health", timeout=timeout).json()
     return bool(response.get("status", "") == "ok")
@@ -202,8 +217,8 @@ def props(
     server_host: str | None = None,
     server_port: int | None = None,
     timeout: float = 60.0,
-) -> bool:
+) -> ModelProps:
     """Returns `True` if server is alive and ready, `False` if it's not ready"""
     server_url = _make_llama_server_url(server_host, server_port)
     response = httpx.get(f"{server_url}/props", timeout=timeout).read()
-    return ModelProps.from_json(response)
+    return ModelProps.from_json(response)  # type: ignore
