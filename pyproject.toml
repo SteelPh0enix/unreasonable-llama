@@ -5,7 +5,6 @@ description = "HTTP API bindings for llama.cpp built-in example server"
 authors = [{ name = "SteelPh0enix", email = "wojciech_olech@hotmail.com"}]
 readme = "README.md"
 license = "MIT"
-repository = "https://github.com/SteelPh0enix/unreasonable-llama/"
 requires-python = ">= 3.10"
 dependencies = [
     "dataclasses-json>=0.6.7",
@@ -24,12 +23,11 @@ pretty = true
 
 [dependency-groups]
 dev = [
-    "mypy>=1.14.1",
-    "ruff>=0.9.3",
-    "ruff-lsp>=0.0.60",
+    "mypy>=1.16.1",
+    "ruff>=0.12.1",
+    "ruff-lsp>=0.0.62",
 ]
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
-exclude = [".git*"]
