@@ -26,10 +26,10 @@ Currently supported endpoints (methods) [functions that support them]:
 
 Note: `complete` and `streamed_complete` accept both tokenized and raw prompt.
 
-This librarty uses `httpx`. In case of connection issues, expect
+This library uses `httpx`. In case of connection issues, expect
 `httpx.ConnectError` to happen.
 
-Authenthication and error handling is not implemented yet.
+Authentication and error handling is not implemented yet.
 
 I develop this library mostly for myself - if you want to see more endpoints
 supported, make PRs.
@@ -49,62 +49,65 @@ import httpx
 
 
 @dataclass(frozen=True)
-class LlamaGenerationSettings:
-    """LLM generation settings"""
+class LlamaLoraAdapter:
+    """LoRA adapter"""
 
-    n_ctx: int
-    """Context length"""
-    n_predict: int
-    """Maximum amount of tokens to predict"""
-    model: str
-    """Model name"""
-    seed: int
-    """Seed used for RNG"""
-    seed_cur: int
-    temperature: float
-    """Temperature controls the probability distribution of tokens selected by LLM.
-    Temperature shouldn't be below 0."""
+    id: int
+    scale: float
+
+    @staticmethod
+    def _from_llama_cpp_response(response: dict[str, Any]) -> LlamaLoraAdapter:
+        """hard-coded conversion from JSON to LlamaLoraAdapter"""
+        return LlamaLoraAdapter(id=response["id"], scale=response["scale"])
+
+
+@dataclass(frozen=True)
+class LlamaSpeculativeSettings:
+    n_max: int
+    n_min: int
+    p_min: float
+
+    @staticmethod
+    def _from_llama_cpp_response(response: dict[str, Any]) -> LlamaSpeculativeSettings:
+        """hard-coded conversion from JSON to LlamaSpeculativeSettings"""
+        return LlamaSpeculativeSettings(
+            n_max=response["speculative.n_max"],
+            n_min=response["speculative.n_min"],
+            p_min=response["speculative.p_min"],
+        )
+
+
+@dataclass(frozen=True)
+class LlamaGenerationParams:
+    """LLM generation parameters"""
+
+    chat_format: str
+    """Chat format"""
+    dry_allowed_length: int
+    """Allowed length for DRY sampling"""
+    dry_base: float
+    """DRY repetition penalty base value"""
+    dry_multiplier: float
+    """DRY repetition penalty multiplier"""
+    dry_penalty_last_n: int
+    """How many tokens to scan for repetitions, -1 = context size, 0 = disabled"""
     dynatemp_range: float
     """Dynamic temperature range, if non-zero, defines the range of temperature used during token prediction.
     Final temperature will be applied based on tokens entropy."""
     dynatemp_exponent: float
     """Dynamic temperature exponent, 1 by default"""
-    top_k: int
-    """Top-K sampling limits the number of tokens considered during prediction to specified value."""
-    top_p: float
-    """Top-P sampling limits the number of tokens considered during prediction based on their cumulative probability."""
-    min_p: float
-    """Min-P defines the minimum probability of token to be considered during prediction."""
-    xtc_probability: float
-    """This parameter tweaks the chance of XTC sampling happening."""
-    xtc_threshold: float
-    """XTC removes tokens with probability above specified threshold, except least probable one of them."""
-    # NOTE: This was removed in recent llama.cpp release, i'm keeping it here commented for legacy purposes.
-    # tfs_z: float
-    # """Tail-free sampling removes the tokens with less-than-desired second derivative of it's probability.
-    # This parameter defines the probability in (0, 1] range, where 1 == TFS disabled."""
-    typical_p: float
-    """Locally typical sampling can increase diversity of the text without major coherence degradation by choosing tokens that are typical or expected based on the context.
-    This parameter defines probability in range (0, 1], where 1 == locally typical sampling disabled."""
-    repeat_last_n: int
-    """Amount of last tokens to penalize for repetition. Setting this to 0 disabled penalization, and -1 penalizes the whole context."""
-    repeat_penalty: float
-    """Penalty for repeating the tokens in generated text."""
-    presence_penalty: float
-    """Penalty for re-using the tokens that are already present in generated text. 0 == presence penalty disabled."""
     frequency_penalty: float
     """Penalty applied for re-using the tokens that are already present in generated text, based on the frequency of their appearance. 0 == frequency penalty disabled."""
-    dry_multiplier: float
-    """DRY sampling repetition penalty multiplier. Penalty is calculated with following formula: multiplier * base ^ (length of sequence before token - allowed length).
-    DRY sampling is described here: https://github.com/oobabooga/text-generation-webui/pull/5677"""
-    dry_base: float
-    """DRY sampling base penalty. See dry_multiplier docs for details."""
-    dry_allowed_length: int
-    """Tokens extending repetitions beyond this receive penalty. See dry_multiplier docs for details."""
-    dry_penalty_last_n: int
-    """How many tokens should be scanned for repetition (0 = penalization disabled, -1 = whole context)"""
-    dry_sequence_breakers: list[str]
-    """DRY sampler's sequence breakers."""
+    ignore_eos: bool
+    """Ignore end-of-sentence token?"""
+    lora: list[LlamaLoraAdapter]
+    """LoRA adapters"""
+    max_tokens: int
+    """Maximum amount of generated tokens."""
+    min_keep: int
+    """If greater than 0, forces the sampler to return at least min_keep tokens."""
+    min_p: float
+    """Min-P defines the minimum probability of token to be considered during prediction."""
     mirostat: int
     """Mirostat type, 1 - Mirostat, 2 - Mirostat 2.0, 0 - disabled.
     ENABLING MIROSTAT DISABLES OTHER SAMPLERS!"""
@@ -112,94 +115,178 @@ class LlamaGenerationSettings:
     """Mirostat target entropy, desired perplexity for generated text."""
     mirostat_eta: float
     """Mirostat learning rate."""
-    penalize_nl: bool
-    """Penalize newline tokens?"""
-    stop: list[str]
-    """List of strings stopping the generation."""
-    max_tokens: int
-    """Maximum amount of generated tokens."""
+    n_discard: int
+    """Number of tokens after n_keep that may be discarded when shifting context, 0 default to half."""
     n_keep: int
     """Amount of tokens to keep from initial prompt when context is filled and it shifts."""
-    n_discard: int
-    """Number of tokens after n_keep that may be discarded when shifront context, 0 default to half."""
-    ignore_eos: bool
-    """Ignore end-of-sentence token?"""
-    stream: bool
-    """Is completion streamed?"""
+    n_predict: int
+    """Maximum amount of tokens to predict"""
     n_probs: int
-    """If greater than 0, llama.cpp server will output the probabilities of top n_probs tokens.
-    Not supported in requests yet."""
-    min_keep: int
-    """If greater than 0, forces the sampler to return at least min_keep tokens."""
-    grammar: str
-    """Custom, optional BNF-like grammar to constrain sampling."""
+    """If greater than 0, llama.cpp server will output the probabilities of top n_probs tokens."""
+    post_sampling_probs: bool
+    """Return probabilities of top n_probs tokens after applying sampling chain?"""
+    presence_penalty: float
+    """Penalty for re-using the tokens that are already present in generated text. 0 == presence penalty disabled."""
+    reasoning_format: str
+    """Reasoning format"""
+    reasoning_in_content: bool
+    """Is reasoning embedded in content?"""
+    repeat_last_n: int
+    """Amount of last tokens to penalize for repetition. Setting this to 0 disabled penalization, and -1 penalizes the whole context."""
+    repeat_penalty: float
+    """Penalty for repeating the tokens in generated text."""
     samplers: list[str]
     """List of used samplers in order."""
+    seed: int
+    """Seed used for RNG"""
+    speculative: LlamaSpeculativeSettings
+    stream: bool
+    """Is the response streamed?"""
+    temperature: float
+    """Temperature controls the probability distribution of tokens selected by LLM.
+    Temperature shouldn't be below 0."""
+    thinking_forced_open: bool
+    """Force a reasoning model to always output reasoning (only works with certain models)"""
+    timings_per_token: bool
+    """Include prompt processing and text generation speed information in each response"""
+    top_k: int
+    """Top-K sampling limits the number of tokens considered during prediction to specified value."""
+    top_n_sigma: float
+    """Top-N sigma sampler"""
+    top_p: float
+    """Top-P sampling limits the number of tokens considered during prediction based on their cumulative probability."""
+    typical_p: float
+    """Locally typical sampling can increase diversity of the text without major coherence degradation by choosing tokens that are typical or expected based on the context.
+    This parameter defines probability in range (0, 1], where 1 == locally typical sampling disabled."""
+    xtc_probability: float
+    """This parameter tweaks the chance of XTC sampling happening."""
+    xtc_threshold: float
+    """XTC removes tokens with probability above specified threshold, except least probable one of them."""
+
+    @staticmethod
+    def _from_llama_cpp_response(response: dict[str, Any]) -> LlamaGenerationParams:
+        """hard-coded conversion from JSON to LlamaGenerationSettings"""
+        lora = [LlamaLoraAdapter._from_llama_cpp_response(lora_json) for lora_json in response["lora"]]
+        speculative = LlamaSpeculativeSettings._from_llama_cpp_response(response)
+        return LlamaGenerationParams(
+            chat_format=response["chat_format"],
+            dry_allowed_length=response["dry_allowed_length"],
+            dry_base=response["dry_base"],
+            dry_multiplier=response["dry_multiplier"],
+            dry_penalty_last_n=response["dry_penalty_last_n"],
+            dynatemp_range=response["dynatemp_range"],
+            dynatemp_exponent=response["dynatemp_exponent"],
+            frequency_penalty=response["frequency_penalty"],
+            ignore_eos=response["ignore_eos"],
+            lora=lora,
+            max_tokens=response["max_tokens"],
+            min_keep=response["min_keep"],
+            min_p=response["min_p"],
+            mirostat=response["mirostat"],
+            mirostat_tau=response["mirostat_tau"],
+            mirostat_eta=response["mirostat_eta"],
+            n_discard=response["n_discard"],
+            n_keep=response["n_keep"],
+            n_predict=response["n_predict"],
+            n_probs=response["n_probs"],
+            post_sampling_probs=response["post_sampling_probs"],
+            presence_penalty=response["presence_penalty"],
+            reasoning_format=response["reasoning_format"],
+            reasoning_in_content=response["reasoning_in_content"],
+            repeat_last_n=response["repeat_last_n"],
+            repeat_penalty=response["repeat_penalty"],
+            samplers=response["samplers"],
+            seed=response["seed"],
+            speculative=speculative,
+            stream=response["stream"],
+            temperature=response["temperature"],
+            thinking_forced_open=response["thinking_forced_open"],
+            timings_per_token=response["timings_per_token"],
+            top_k=response["top_k"],
+            top_n_sigma=response["top_n_sigma"],
+            top_p=response["top_p"],
+            typical_p=response["typical_p"],
+            xtc_probability=response["xtc_probability"],
+            xtc_threshold=response["xtc_threshold"],
+        )
+
+
+@dataclass(frozen=True)
+class LlamaGenerationSettings:
+    """LLM generation settings"""
+
+    n_ctx: int
+    """Context length"""
+    params: LlamaGenerationParams
+    """Generation parameters"""
 
     @staticmethod
     def _from_llama_cpp_response(response: dict[str, Any]) -> LlamaGenerationSettings:
         """hard-coded conversion from JSON to LlamaGenerationSettings"""
-        return LlamaGenerationSettings(
-            n_ctx=response["n_ctx"],
-            n_predict=response["n_predict"],
-            model=response["model"],
-            seed=response["seed"],
-            seed_cur=response["seed_cur"],
-            temperature=response["temperature"],
-            dynatemp_range=response["dynatemp_range"],
-            dynatemp_exponent=response["dynatemp_exponent"],
-            top_k=response["top_k"],
-            top_p=response["top_p"],
-            min_p=response["min_p"],
-            xtc_probability=response["xtc_probability"],
-            xtc_threshold=response["xtc_threshold"],
-            # tfs_z=response["tfs_z"],
-            typical_p=response["typical_p"],
-            repeat_last_n=response["repeat_last_n"],
-            repeat_penalty=response["repeat_penalty"],
-            presence_penalty=response["presence_penalty"],
-            frequency_penalty=response["frequency_penalty"],
-            dry_multiplier=response["dry_multiplier"],
-            dry_base=response["dry_base"],
-            dry_allowed_length=response["dry_allowed_length"],
-            dry_penalty_last_n=response["dry_penalty_last_n"],
-            dry_sequence_breakers=response["dry_sequence_breakers"],
-            mirostat=response["mirostat"],
-            mirostat_tau=response["mirostat_tau"],
-            mirostat_eta=response["mirostat_eta"],
-            penalize_nl=response["penalize_nl"],
-            stop=response["stop"],
-            max_tokens=response["max_tokens"],
-            n_keep=response["n_keep"],
-            n_discard=response["n_discard"],
-            ignore_eos=response["ignore_eos"],
-            stream=response["stream"],
-            n_probs=response["n_probs"],
-            min_keep=response["min_keep"],
-            grammar=response["grammar"],
-            samplers=response["samplers"],
-        )
+        params = LlamaGenerationParams._from_llama_cpp_response(response["params"])
+        return LlamaGenerationSettings(n_ctx=response["n_ctx"], params=params)
+
+
+@dataclass(frozen=True)
+class LlamaModalities:
+    """Information about model's capabilities support"""
+
+    audio: bool
+    vision: bool
+
+    @staticmethod
+    def _from_llama_cpp_response(response: dict[str, Any]) -> LlamaModalities:
+        """hard-coded conversion from JSON to LlamaModalities"""
+        return LlamaModalities(audio=response["audio"], vision=response["vision"])
 
 
 @dataclass(frozen=True)
 class LlamaProps:
     """llama.cpp server properties."""
 
-    default_generation_settings: LlamaGenerationSettings
-    """Default generation settings for currently loaded model."""
-    total_slots: int
-    """Amount of slots supported by the server."""
+    bos_token: str
+    """Beginning-of-sentence token"""
+    build_info: str
+    """llama.cpp build information"""
     chat_template: str
-    """Chat template for currently loaded model."""
+    """Model's chat template"""
+    default_generation_settings: LlamaGenerationSettings
+    """Default generation settings"""
+    endpoint_metrics: bool
+    """Whether /metrics endpoint is enabled or not"""
+    endpoint_props: bool
+    """Whether /props endpoint is enabled or not"""
+    endpoint_slots: bool
+    """Whether /slots endpoint is enabled or not"""
+    eos_token: str
+    """End-of-sentence token"""
+    modalities: LlamaModalities
+    """Model's capabilities"""
+    model_path: str
+    """Model's file path"""
+    total_slots: int
+    """Amount of available slots"""
+    webui: bool
+    """Whether webui is enabled or not"""
 
     @staticmethod
     def _from_llama_cpp_response(response: dict[str, Any]) -> LlamaProps:
-        """hard-coded converstion from JSON to LlamaProps"""
+        """hard-coded conversion from JSON to LlamaProps"""
         generation_settings = LlamaGenerationSettings._from_llama_cpp_response(response["default_generation_settings"])
+        modalities = LlamaModalities._from_llama_cpp_response(response["modalities"])
         return LlamaProps(
-            default_generation_settings=generation_settings,
-            total_slots=response["total_slots"],
+            bos_token=response["bos_token"],
+            build_info=response["build_info"],
             chat_template=response["chat_template"],
+            default_generation_settings=generation_settings,
+            eos_token=response["eos_token"],
+            endpoint_metrics=response["eos_token"],
+            endpoint_props=response["endpoint_props"],
+            endpoint_slots=response["endpoint_slots"],
+            modalities=modalities,
+            model_path=response["model_path"],
+            total_slots=response["total_slots"],
+            webui=response["webui"],
         )
 
 
@@ -239,7 +326,7 @@ class LlamaModelMeta:
 
     @staticmethod
     def _from_llama_cpp_response(response: dict[str, Any]) -> LlamaModelMeta:
-        """hard-coded converstion from JSON to LlamaModelMeta"""
+        """hard-coded conversion from JSON to LlamaModelMeta"""
         return LlamaModelMeta(
             vocab_type=LlamaVocabType(response["vocab_type"]),
             n_vocab=response["n_vocab"],
@@ -263,7 +350,7 @@ class LlamaModel:
 
     @staticmethod
     def _from_llama_cpp_response(response: dict[str, Any]) -> LlamaModel:
-        """hard-coded converstion from JSON to LlamaModel"""
+        """hard-coded conversion from JSON to LlamaModel"""
         return LlamaModel(
             id=response["id"],
             created=datetime.fromtimestamp(response["created"]),
@@ -324,12 +411,12 @@ class LlamaCompletionRequest:
     n_keep: int | None = None
     """Amount of tokens to keep from initial prompt when context is filled and it shifts."""
     n_discard: int | None = None
-    """Number of tokens after n_keep that may be discarded when shifront context, 0 default to half."""
+    """Number of tokens after n_keep that may be discarded when shifting context, 0 default to half."""
     seed: int | None = None
     """Seed used for RNG"""
     min_keep: int | None = None
     """If greater than 0, forces the sampler to return at least min_keep tokens."""
-    predition_time_limit_ms: int | None = None
+    prediction_time_limit_ms: int | None = None
     """Time limit for prediction (text-generation) phase in milliseconds.
     Starts counting when first token is generated.
     If <= 0, timeout is disabled."""
@@ -368,7 +455,7 @@ class LlamaCompletionRequest:
             "n_discard": self.n_discard,
             "seed": self.seed,
             "min_keep": self.min_keep,
-            "t_max_predict_ms": self.predition_time_limit_ms,
+            "t_max_predict_ms": self.prediction_time_limit_ms,
             "ignore_eos": self.ignore_eos,
             "stop": self.stop,
             "samplers": self.samplers,
@@ -400,7 +487,7 @@ class LlamaTimings:
 
     @staticmethod
     def _from_llama_cpp_response(response: dict[str, Any]) -> LlamaTimings:
-        """hard-coded converstion from JSON to LlamaTimings"""
+        """hard-coded conversion from JSON to LlamaTimings"""
         return LlamaTimings(
             predicted_ms=response["predicted_ms"],
             predicted_n=response["predicted_n"],
@@ -453,7 +540,7 @@ class LlamaCompletionResponse:
 
     @staticmethod
     def _from_llama_cpp_response(response: dict[str, Any]) -> LlamaCompletionResponse:
-        """hard-coded converstion from JSON to LlamaCompletionResponse"""
+        """hard-coded conversion from JSON to LlamaCompletionResponse"""
         generation_settings = None
         if response_gen_settings := response.get("generation_settings", None):
             generation_settings = LlamaGenerationSettings._from_llama_cpp_response(response_gen_settings)
